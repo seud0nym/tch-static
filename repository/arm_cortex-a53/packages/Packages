@@ -6,7 +6,7 @@ Section: admin
 Architecture: arm_cortex-a53
 Installed-Size: 345984
 Filename: htop-static_3.2.2_arm_cortex-a53.ipk
-Size: 346409
-SHA256sum: f3254c917f22121d675726f54ec22d4d90c6471206341fc3f425dca462073a85
+Size: 346413
+SHA256sum: 39a2ca602f03d067adac363d3ec1f40a58883a1fd7074b00ad09d732535b8121
 Description: Htop is an ncursed-based process viewer similar to top, but it allows to scroll the list vertically and horizontally to see all processes and their full command lines.
 

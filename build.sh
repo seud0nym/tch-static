@@ -66,6 +66,19 @@ main() { # Parameters: none
   done
 }
 
+make_ipk() {
+  ${__BASE_DIR}/make_ipk.sh "$2" "."
+  local arch="$1"
+  local ipk="$(basename $2)"
+  local sha256="$(sha256sum "$2" | cut -d" " -f1)"
+  local size="$(du --bytes $2 | cut -f1)"
+  sed -e "/^Installed-Size:/a\Filename: $(basename $ipk)\nSize: ${size}\nSHA256sum: ${sha256}" control >> $__BASE_DIR/repository/${arch}/packages/Packages
+  echo "" >> "$__BASE_DIR/repository/${arch}/packages/Packages"
+  ${__BASE_DIR}/usign -S -m "$__BASE_DIR/repository/${arch}/packages/Packages" -s ${__BASE_DIR}/tch-static-private.key -x "$__BASE_DIR/repository/${arch}/packages/Packages.sig"
+  gzip -fk "$__BASE_DIR/repository/${arch}/packages/Packages"
+  rm -f control.tar control.tar.gz data.tar data.tar.gz packagetemp.tar
+}
+
 make_package() { # Parameters: script version binary [binary ...]
   local script="$1"
   local version="$2"
@@ -81,7 +94,7 @@ make_package() { # Parameters: script version binary [binary ...]
     strip_and_compress $binary
     cp -p $binary /tmp/__make_static_package/usr/bin/
     chmod +x /tmp/__make_static_package/usr/bin/$binary
-    size=$(( $size + $(du --bytes "/tmp/__make_static_package/usr/bin/$binary" | cut -f1)))
+    size=$(( $size + $(du --bytes "/tmp/__make_static_package/usr/bin/$binary" | cut -f1) ))
   done
 
   pushd /tmp/__make_static_package
@@ -114,14 +127,7 @@ CTL
       sed -e "/^Package: $script-static\$/,/^\$/d" -i $__BASE_DIR/repository/${arch}/packages/Packages
     fi
     sed -e "s/^Architecture:.*\$/Architecture: $arch/" -i control
-    local ipk=""${__BASE_DIR}/repository/${arch}/packages/${script}-static_${version}_${arch}.ipk""
-    ${__BASE_DIR}/make_ipk.sh "$ipk" "."
-    local sha256="$(sha256sum "$ipk" | cut -d" " -f1)"
-    local ip_size="$(du --bytes $ipk | cut -f1)"
-    sed -e "/^Installed-Size:/a\Filename: $(basename $ipk)\nSize: ${ip_size}\nSHA256sum: ${sha256}" control >> $__BASE_DIR/repository/${arch}/packages/Packages
-    echo "" >> "$__BASE_DIR/repository/${arch}/packages/Packages"
-    gzip -fk "$__BASE_DIR/repository/${arch}/packages/Packages"
-    rm -f control.tar control.tar.gz data.tar data.tar.gz packagetemp.tar
+    make_ipk $arch "${__BASE_DIR}/repository/${arch}/packages/${script}-static_${version}_${arch}.ipk"
   done
   
   popd
@@ -142,17 +148,6 @@ strip_and_compress() { # Parameters: executable
   strip -s -R .comment --strip-unneeded $1
   upx --ultra-brute $1
 }
-
-update_packages_file() {
-  local arch="$1"
-  local ipk="$(basename $2)"
-  local sha256="$(sha256sum "$2" | cut -d" " -f1)"
-  local size="$(du --bytes $2 | cut -f1)"
-  sed -e "/^Installed-Size:/a\Filename: ${ipk}\nSize: ${size}\nSHA256sum: ${sha256}" $WORK_DIR/control >> repository/${arch}/packages/Packages
-  echo "" >> repository/${arch}/packages/Packages
-}
-
-
 
 check_package git git
 check_package gcc gcc
