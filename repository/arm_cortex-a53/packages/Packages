@@ -1,0 +1,12 @@
+Package: htop-static
+Version: 3.2.2
+Depends: libncurses
+License: GPL-2.0-or-later
+Section: admin
+Architecture: arm_cortex-a53
+Installed-Size: 345984
+Filename: htop-static_3.2.2_arm_cortex-a53.ipk
+Size: 346409
+SHA256sum: f3254c917f22121d675726f54ec22d4d90c6471206341fc3f425dca462073a85
+Description: Htop is an ncursed-based process viewer similar to top, but it allows to scroll the list vertically and horizontally to see all processes and their full command lines.
+
