@@ -4,7 +4,14 @@ Packages containing statically linked arm binaries, specifically for deployment 
 
 ## Configuring opkg
 
-The `/etc/opkg.conf` file must contain the architecture for your device. e.g. for a 32 bit Technicolor device, it will look something like this:
+### /etc/opkg.conf
+
+The `/etc/opkg.conf` file must contain the architecture for your device.
+
+#### 32 bit ARM Cortex-A9 Devices
+
+Example for a 32 bit Technicolor device such as the Telstra Smart Modem Gen 2 and earlier generation devices:
+
 ```
 dest root /
 dest ram /tmp
@@ -18,7 +25,16 @@ arch brcm63xx-tch 30
 arch bcm53xx 40
 ```
 
-For a 64-bit device such as the Telstra Smart Modem Gen 3, it will look something like this:
+The following line also needs to be added to `/etc/opkg/customfeeds.conf`:
+
+```
+src/gz tch_static https://raw.githubusercontent.com/seud0nym/tch-static/master/repository/arm_cortex-a9/packages
+```
+
+#### 64-bit device ARM Cortex-A53 Devices
+
+Example for a 64 bit Technicolor device such as the Telstra Smart Modem Gen 3:
+
 ```
 dest root /
 dest ram /tmp
@@ -34,13 +50,14 @@ arch aarch64_cortex-a53 20
 
 The following line also needs to be added to `/etc/opkg/customfeeds.conf`:
 ```
-src/gz tch_static https://raw.githubusercontent.com/seud0nym/tch-static/master/repository/arm_cortex-a9/packages
+src/gz tch_static https://raw.githubusercontent.com/seud0nym/tch-static/master/repository/arm_cortex-a53/packages
 ```
 
 ### Package Signature Verification
 
-Later versions of `opkg` require the Package index file to signed. If you get a "Signature check failed" error when executing `opkg update`, download and add the key file:
-```
+Later versions of `opkg` require the Package index file to signed. If you get a "_Signature check failed_" error when executing `opkg update`, download and add the key file:
+
+```bash
 curl -sklO https://raw.githubusercontent.com/seud0nym/tch-static/master/keys/seud0nym-public.key
 opkg-key add seud0nym-public.key
 rm seud0nym-public.key
