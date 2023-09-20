@@ -2,6 +2,7 @@
 
 # build variables
 htop_binaries="htop"
+htop_version="unknown"
 htop_configure_options="--enable-static --disable-unicode --disable-hwloc --disable-setuid --disable-sensors --disable-capabilities --disable-openvz --disable-vserver --disable-ancient-vserver --disable-delayacct --disable-linux-affinity"
 htop_make_options=""
 
