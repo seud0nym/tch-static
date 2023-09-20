@@ -43,6 +43,7 @@ check_package() { # Parameters: executable package
 }
 
 fetch_latest() { # Parameters: none
+  eval __VERSION="\$${__SCRIPT}_version"
   if [ -d .git ]; then
     git fetch
     git gc
@@ -50,17 +51,18 @@ fetch_latest() { # Parameters: none
     git merge
     git fetch --tags
     __VERSION=$(git describe --tags `git rev-list --tags --max-count=1`)
+    git config --add advice.detachedHead false
     git checkout $__VERSION
   fi
 }
 
 main() { # Parameters: none
   for __SCRIPT in $__SCRIPTS; do
-    ${__SCRIPT}_pushd
+    eval ${__SCRIPT}_pushd
       fetch_latest
-      [ -x ./autogen.sh ] && ./autogen.sh
-      [ -x ./configure ]  && env FORCE_UNSAFE_CONFIGURE=1 CFLAGS="-static -Os -ffunction-sections -fdata-sections" LDFLAGS='-Wl,--gc-sections' ./configure $(eval echo -n \$${__SCRIPT}_configure_options)
-      make $(eval echo -n \$${__SCRIPT}_make_options) -j $(nproc)
+      [ -x autogen.sh ] && ./autogen.sh
+      [ -x configure ]  && env FORCE_UNSAFE_CONFIGURE=1 CFLAGS="-static -Os -ffunction-sections -fdata-sections" LDFLAGS='-Wl,--gc-sections' ./configure $(eval echo -n \$${__SCRIPT}_configure_options)
+      [ -e Makefile ]   && make $(eval echo -n \$${__SCRIPT}_make_options) -j $(nproc)
       make_package $__SCRIPT $__VERSION $(eval echo -n \$${__SCRIPT}_binaries)
     popd
   done
@@ -74,17 +76,16 @@ make_ipk() {
   local size="$(du --bytes $2 | cut -f1)"
   sed -e "/^Installed-Size:/a\Filename: $(basename $ipk)\nSize: ${size}\nSHA256sum: ${sha256}" control >> $__BASE_DIR/repository/${arch}/packages/Packages
   echo "" >> "$__BASE_DIR/repository/${arch}/packages/Packages"
-  ${__BASE_DIR}/usign -S -m "$__BASE_DIR/repository/${arch}/packages/Packages" -s ${__BASE_DIR}/tch-static-private.key -x "$__BASE_DIR/repository/${arch}/packages/Packages.sig"
+  ${__BASE_DIR}/usign -S -m "$__BASE_DIR/repository/${arch}/packages/Packages" -s ${__BASE_DIR}/seud0nym-private.key -x "$__BASE_DIR/repository/${arch}/packages/Packages.sig"
   gzip -fk "$__BASE_DIR/repository/${arch}/packages/Packages"
   rm -f control.tar control.tar.gz data.tar data.tar.gz packagetemp.tar
 }
 
 make_package() { # Parameters: script version binary [binary ...]
+  local arch binary
+  local size=0
   local script="$1"
   local version="$2"
-  local arch 
-  local size=0
-  local binary
   shift 2
 
   [ -e /tmp/__make_static_package ] && rm -rf /tmp/__make_static_package
@@ -103,9 +104,10 @@ make_package() { # Parameters: script version binary [binary ...]
   { [ "$(type -t ${script}_conffiles)" == "function" ] && eval echo -n \$${script}_conffiles || __default_conffiles; } > conffiles
   { [ "$(type -t ${script}_postinst)" == "function" ]  && eval echo -n \$${script}_postinst  || __default_postinst;  } > postinst
   { [ "$(type -t ${script}_prerm)" == "function" ]     && eval echo -n \$${script}_prerm     || __default_prerm;     } > prerm
+    [ "$(type -t ${script}_postrm)" == "function" ]    && eval echo -n \$${script}_postrm                              > postrm
 
-  chmod +x postinst
-  chmod +x prerm
+  chmod +x postinst prerm
+  [ -e postrm ] && chmod +x postrm
 
   cat <<CTL > control
 Package: ${script}-static
@@ -129,19 +131,21 @@ CTL
     sed -e "s/^Architecture:.*\$/Architecture: $arch/" -i control
     make_ipk $arch "${__BASE_DIR}/repository/${arch}/packages/${script}-static_${version}_${arch}.ipk"
   done
+
+  [ -e postrm ] && rm postrm
   
   popd
 }
 
-popd_build_directory() { # Parameters: none
+popd_work_directory() { # Parameters: none
   popd
 }
 
-pushd_build_directory() { # Parameters: none
-  if [ ! -d build ]; then
-    mkdir build
+pushd_work_directory() { # Parameters: none
+  if [ ! -d .work ]; then
+    mkdir .work
   fi
-  pushd build
+  pushd .work
 }
 
 strip_and_compress() { # Parameters: executable
@@ -157,6 +161,6 @@ check_package automake automake
 check_package upx upx-ucl
 check_dependencies
 
-pushd_build_directory
+pushd_work_directory
 main
-popd_build_directory
+popd_work_directory
