@@ -37,8 +37,19 @@ The following line also needs to be added to `/etc/opkg/customfeeds.conf`:
 src/gz tch_static https://raw.githubusercontent.com/seud0nym/tch-static/master/repository/arm_cortex-a9/packages
 ```
 
+### Package Signature Verification
+
+Later versions of `opkg` require the Package index file to signed. If you get a "Signature check failed" error when executing `opkg update`, download and add the key file:
+```
+curl -sklO https://raw.githubusercontent.com/seud0nym/tch-static/master/keys/seud0nym-public.key
+opkg-key add seud0nym-public.key
+rm seud0nym-public.key
+```
+
 ## Building
 
-The binaries were built using the `build.sh` script on Debian v11.6 (bullseye) running on a Marvell Feroceon 88FR131 (armv5tel) processor system. The script checks for and installs required dependencies.
+Each package to be compiled is configured through a script in the `scripts` folder. Each script must be named the same as the target package, and must contain the required variables and functions prefixed by the script name.
+
+The binaries were built using the `build.sh` script on Debian v11.6 (bullseye) armv5tel processor system. The script checks for and installs required dependencies.
 
 The individual OpenWrt opkg .ipk files are built using an adapted version of the `make-ipk.sh` from https://bitsum.com/creating_ipk_packages.htm.
