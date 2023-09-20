@@ -57,6 +57,7 @@ fetch_latest() { # Parameters: none
 }
 
 main() { # Parameters: none
+  chmod +x $__BASE_DIR/bin/*
   for __SCRIPT in $__SCRIPTS; do
     eval ${__SCRIPT}_pushd
       fetch_latest
@@ -69,15 +70,17 @@ main() { # Parameters: none
 }
 
 make_ipk() {
-  ${__BASE_DIR}/make_ipk.sh "$2" "."
+  ${__BASE_DIR}/bin/make_ipk.sh "$2" "."
   local arch="$1"
   local ipk="$(basename $2)"
   local sha256="$(sha256sum "$2" | cut -d" " -f1)"
   local size="$(du --bytes $2 | cut -f1)"
-  sed -e "/^Installed-Size:/a\Filename: $(basename $ipk)\nSize: ${size}\nSHA256sum: ${sha256}" control >> $__BASE_DIR/repository/${arch}/packages/Packages
-  echo "" >> "$__BASE_DIR/repository/${arch}/packages/Packages"
-  ${__BASE_DIR}/usign -S -m "$__BASE_DIR/repository/${arch}/packages/Packages" -s ${__BASE_DIR}/seud0nym-private.key -x "$__BASE_DIR/repository/${arch}/packages/Packages.sig"
-  gzip -fk "$__BASE_DIR/repository/${arch}/packages/Packages"
+  local packages="$__BASE_DIR/repository/${arch}/packages/Packages"
+  sed -e "/^Package: $script-static\$/,/^\$/d" -i $packages
+  sed -e "/^Installed-Size:/a\Filename: ${ipk}\nSize: ${size}\nSHA256sum: ${sha256}" control >> $packages
+  echo "" >> $packages
+  ${__BASE_DIR}/bin/usign -S -m $packages -s ${__BASE_DIR}/keys/seud0nym-private.key -x ${packages}.sig
+  gzip -fk $packages
   rm -f control.tar control.tar.gz data.tar data.tar.gz packagetemp.tar
 }
 
@@ -126,7 +129,6 @@ CTL
     [ ! -e $__BASE_DIR/repository/${arch}/packages/Packages ] && touch $__BASE_DIR/repository/${arch}/packages/Packages
     if [ -e $__BASE_DIR/repository/${arch}/packages/${script}-static_[^_]*_${arch}.ipk ]; then
       rm -rf $__BASE_DIR/repository/${arch}/packages/${script}-static_[^_]*_${arch}.ipk
-      sed -e "/^Package: $script-static\$/,/^\$/d" -i $__BASE_DIR/repository/${arch}/packages/Packages
     fi
     sed -e "s/^Architecture:.*\$/Architecture: $arch/" -i control
     make_ipk $arch "${__BASE_DIR}/repository/${arch}/packages/${script}-static_${version}_${arch}.ipk"
