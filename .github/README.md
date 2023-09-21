@@ -69,4 +69,4 @@ Each package to be compiled is configured through a script in the `scripts` fold
 
 The binaries were built using the `build.sh` script on Debian v11.6 (bullseye) armv5tel processor system. The script checks for and installs required dependencies.
 
-The individual OpenWrt opkg .ipk files are built using an adapted version of the `make-ipk.sh` from https://bitsum.com/creating_ipk_packages.htm.
+The individual OpenWrt opkg .ipk files are built using an adapted version of the `make-ipk.sh` from https://bitsum.com/creating_ipk_packages.htm, which is executed automatically by `build.sh`.
