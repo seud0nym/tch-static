@@ -95,7 +95,7 @@ make_package() { # Parameters: script version binary [binary ...]
   mkdir -p /tmp/__make_static_package/usr/bin
 
   for binary in $*; do
-    strip_and_compress $binary
+    [ -x $binary ] && strip_and_compress $binary
     cp -p $binary /tmp/__make_static_package/usr/bin/
     chmod +x /tmp/__make_static_package/usr/bin/$binary
     size=$(( $size + $(du --bytes "/tmp/__make_static_package/usr/bin/$binary" | cut -f1) ))
