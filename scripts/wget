@@ -15,13 +15,6 @@ wget_Description="  Wget is a network utility to retrieve files from the Web usi
  and ftp, the two most widely used Internet protocols.
  This package is built with SSL support."
 
-wget_dependencies() {
-  # Either:
-  # - call the check_package function with the name of an executable and the required package; OR
-  # - APPEND to the __PACKAGES global variable
-  echo -n ""
-}
-
 wget_postrm() {
   cat <<POR
 #!/bin/sh
