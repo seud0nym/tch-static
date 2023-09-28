@@ -1,4 +1,113 @@
 #!/bin/bash
+GREEN='\033[1;32m'
+GREY='\033[90m'
+ORANGE='\033[0;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+__PKG_ONLY=N
+__REBUILD=N
+__THIS_ARCH=$(uname -m)
+
+if [ $__THIS_ARCH == x86_64 -o $__THIS_ARCH == aarch64 ]; then
+  __MUSL_ARCH=(arm aarch64)
+  __MUSL_PRFX=(${__MUSL_ARCH[0]}-linux-musleabi ${__MUSL_ARCH[1]}-linux-musl)
+  __OWRT_ARCH=(arm_cortex-a9 arm_cortex-a53)
+elif [[ $__THIS_ARCH =~ ^armv[567] ]]; then
+  __MUSL_ARCH=(arm)
+  __OWRT_ARCH=(arm_cortex-a9)
+else
+  echo -e "${RED}$(date +%X) ==> ERROR: Unsupported build machine: ${__THIS_ARCH}!${NC}"
+  exit 2
+fi
+
+echo -e "${GREEN}$(date +%X) ==> INFO:  Checking for required keys....${GREY}[$(pwd)]${NC}"
+[ -e keys/seud0nym-private.key ] || { echo -e "${RED}$(date +%X) ==> ERROR: Private key not found!${NC}"; exit 2; }
+
+if [ "$1" == "clean" ]; then
+  shift
+  echo -e "${GREEN}$(date +%X) ==> INFO:  Cleaning...${GREY}[$(pwd)]${NC}"
+  rm -rf .work repository
+fi
+
+case $(nproc) in
+	1|2) __JOBS=1;;
+	3|4) __JOBS=2;;
+	*)	 __JOBS=$(( $(nproc) - 2 ));;
+esac
+echo -e "${GREY}$(date +%X) ==> DEBUG: Maximum make jobs: $__JOBS${NC}"
+
+git submodule init
+git submodule update
+
+[ ! -d toolchains ] && mkdir toolchains
+for I in $(seq 0 $((${#__MUSL_PRFX[@]} - 1))); do
+  __TARGET=${__MUSL_PRFX[$I]}
+  if [ -n "$(find toolchains/ -name ${__TARGET}-gcc)" ]; then
+    echo -e "${GREEN}$(date +%X) ==> INFO:  Found $__TARGET toolchain${GREY}[$(pwd)]${NC}"
+  elif [ "$__THIS_ARCH" == "x86_64" -o "$__THIS_ARCH" == "${__MUSL_ARCH[$I]}" ]; then
+    echo -e "${GREEN}$(date +%X) ==> INFO:  Downloading $__TARGET toolchain...${GREY}[$(pwd)]${NC}"
+    [ "$__THIS_ARCH" == "${__MUSL_ARCH[$I]}" ] && __MUSL_TYPE="native" || __MUSL_TYPE="cross"
+    curl -L https://musl.cc/${__TARGET}-${__MUSL_TYPE}.tgz -o /tmp/${__TARGET}-${__MUSL_TYPE}.tgz
+    echo -e "${GREEN}$(date +%X) ==> INFO:  Extracting $__TARGET $__MUSL_TYPE toolchain...${GREY}[$(pwd)]${NC}"
+    tar -xzf /tmp/${__TARGET}-${__MUSL_TYPE}.tgz -C toolchains
+    rm -f /tmp/${__TARGET}-${__MUSL_TYPE}.tgz
+  else
+    echo -e "${GREEN}$(date +%X) ==> INFO:  Updating musl-cross-make submodule...${GREY}[$(pwd)]${NC}"
+    pushd musl-cross-make || exit 2
+      git fetch
+      git gc
+      git reset --hard HEAD
+      git merge origin/master
+    popd #musl-cross-make
+    echo -e "${GREEN}$(date +%X) ==> INFO:  Building $__TARGET toolchain...${GREY}[$(pwd)]${NC}"
+    echo "TARGET = $__TARGET" > musl-cross-make/config.mak
+    make -C musl-cross-make clean --silent
+    make -C musl-cross-make -j $__JOBS --silent || exit 2
+    echo -e "${GREEN}$(date +%X) ==> INFO:  Installing $__TARGET toolchain...${GREY}[$(pwd)]${NC}"
+    make -C musl-cross-make OUTPUT="/" DESTDIR="$(pwd)/toolchains" install --silent
+  fi
+done
+
+if [ ! -x bin/usign ]; then
+  pushd usign || exit 2
+    git fetch
+    git gc
+    git reset --hard HEAD
+    git merge origin/master
+    rm -rf build
+    mkdir build
+    pushd build
+      echo -e "${GREEN}$(date +%X) ==> INFO:  Generating build system for usign...${GREY}[$(pwd)]${NC}"
+      cmake ..
+      echo -e "${GREEN}$(date +%X) ==> INFO:  Building usign...${GREY}[$(pwd)]${NC}"
+      make --silent || exit 2
+    popd # build
+  popd # usign
+  cp usign/build/usign bin/usign
+fi
+
+echo -e "${GREEN}$(date +%X) ==> INFO:  Determining latest upx version....${GREY}[$(pwd)]${NC}"
+__UPX_URL=$(curl -Ls -o /dev/null -w %{url_effective} https://github.com/upx/upx/releases/latest)
+__UPX_VER=$(basename $__UPX_URL | sed -e 's/^v//')
+echo -e "${GREY}$(date +%X) ==> DEBUG: Latest upx version: $__UPX_VER${NC}"
+if [ ! -x bin/upx -o "$(bin/upx -V 2>/dev/null | grep ^upx | grep -o '[0-9.]*')" != "$__UPX_VER" ]; then
+  if [ $__THIS_ARCH == x86_64 ]; then
+    __UPX_DIR="upx-${__UPX_VER}-amd64_linux"
+  elif [ $__THIS_ARCH == aarch64 ]; then
+    __UPX_DIR="upx-${__UPX_VER}-arm64_linux"
+  elif [[ $__THIS_ARCH =~ ^armv[567] ]]; then
+    __UPX_DIR="upx-${__UPX_VER}-arm_linux"
+  fi
+  curl -L https://github.com/upx/upx/releases/download/v${__UPX_VER}/${__UPX_DIR}.tar.xz -o /tmp/upx.tar.xz
+  if [ -e /tmp/upx.tar.xz ]; then
+    tar -C bin --strip-components=1 -xJf /tmp/upx.tar.xz ${__UPX_DIR}/upx
+    rm -rf /tmp/upx.tar.xz
+  else
+    echo -e "${RED}$(date +%X) ==> ERROR: Failed to download upx v${__UPX_VER}!${NC}"
+    exit 2
+  fi
+fi
 
 [ -z "$*" ] && __SCRIPTS="$(find scripts -maxdepth 1 -type f ! -name README.md -exec basename {} \;)" || __SCRIPTS="$*"
 
@@ -6,40 +115,27 @@ __BASE_DIR=$(cd $(dirname $0) && pwd)
 __PACKAGES=""
 
 __default_conffiles() {
-cat <<"CNF"
+cat <<-"CNF"
 CNF
 }
 
 __default_postinst() {
-cat <<"POI"
-#!/bin/sh
-[ "${IPKG_NO_SCRIPT}" = "1" ] && exit 0
-[ -s ${IPKG_INSTROOT}/lib/functions.sh ] || exit 0
-. ${IPKG_INSTROOT}/lib/functions.sh
-default_postinst $0 $@
+cat <<-"POI"
+	#!/bin/sh
+	[ "${IPKG_NO_SCRIPT}" = "1" ] && exit 0
+	[ -s ${IPKG_INSTROOT}/lib/functions.sh ] || exit 0
+	. ${IPKG_INSTROOT}/lib/functions.sh
+	default_postinst $0 $@
 POI
 }
 
 __default_prerm() {
-cat <<"PRR"
-#!/bin/sh
-[ -s ${IPKG_INSTROOT}/lib/functions.sh ] || exit 0
-. ${IPKG_INSTROOT}/lib/functions.sh
-default_prerm $0 $@
+cat <<-"PRR"
+	#!/bin/sh
+	[ -s ${IPKG_INSTROOT}/lib/functions.sh ] || exit 0
+	. ${IPKG_INSTROOT}/lib/functions.sh
+	default_prerm $0 $@
 PRR
-}
-
-check_dependencies() { # Parameters: none
-  local __SCRIPT
-  for __SCRIPT in $__SCRIPTS; do
-    source scripts/${__SCRIPT}
-    eval ${__SCRIPT}_dependencies
-  done
-  [ -n "$__PACKAGES" ] && apt install -y $__PACKAGES
-}
-
-check_package() { # Parameters: executable package
-  which $1 >/dev/null || __PACKAGES="$__PACKAGES $2"
 }
 
 fetch_latest() { # Parameters: none
@@ -54,19 +150,6 @@ fetch_latest() { # Parameters: none
     git config --add advice.detachedHead false
     git checkout $__VERSION
   fi
-}
-
-main() { # Parameters: none
-  chmod +x $__BASE_DIR/bin/*
-  for __SCRIPT in $__SCRIPTS; do
-    eval ${__SCRIPT}_pushd
-      fetch_latest
-      [ -x autogen.sh ] && ./autogen.sh
-      [ -x configure ]  && env FORCE_UNSAFE_CONFIGURE=1 CFLAGS="-static -Os -ffunction-sections -fdata-sections" LDFLAGS='-Wl,--gc-sections' ./configure $(eval echo -n \$${__SCRIPT}_configure_options)
-      [ -e Makefile ]   && make $(eval echo -n \$${__SCRIPT}_make_options) -j $(nproc)
-      make_package $__SCRIPT $__VERSION $(eval echo -n \$${__SCRIPT}_binaries)
-    popd
-  done
 }
 
 make_ipk() {
@@ -84,12 +167,15 @@ make_ipk() {
   rm -f control.tar control.tar.gz data.tar data.tar.gz packagetemp.tar
 }
 
-make_package() { # Parameters: script version binary [binary ...]
-  local arch binary
+make_package() { # Parameters: script version architecture binary [binary ...]
   local size=0
+  local binary
   local script="$1"
   local version="$2"
-  shift 2
+  local arch="$3"
+  shift 3
+
+	echo -e "${GREEN}$(date +%X) ==> INFO:  Packaging $script for $arch....${GREY}[$(pwd)]${NC}"
 
   [ -e /tmp/__make_static_package ] && rm -rf /tmp/__make_static_package
   mkdir -p /tmp/__make_static_package/usr/bin
@@ -102,17 +188,17 @@ make_package() { # Parameters: script version binary [binary ...]
   done
 
   pushd /tmp/__make_static_package
+		echo "2.0" > debian_binary
+		{ [ "$(type -t ${script}_conffiles)" == "function" ] && eval echo -n \$${script}_conffiles || __default_conffiles; } > conffiles
+		{ [ "$(type -t ${script}_postinst)" == "function" ]  && eval echo -n \$${script}_postinst  || __default_postinst;  } > postinst
+		{ [ "$(type -t ${script}_prerm)" == "function" ]     && eval echo -n \$${script}_prerm     || __default_prerm;     } > prerm
+			[ "$(type -t ${script}_postrm)" == "function" ]    && eval echo -n \$${script}_postrm                              > postrm
 
-  echo "2.0" > debian_binary
-  { [ "$(type -t ${script}_conffiles)" == "function" ] && eval echo -n \$${script}_conffiles || __default_conffiles; } > conffiles
-  { [ "$(type -t ${script}_postinst)" == "function" ]  && eval echo -n \$${script}_postinst  || __default_postinst;  } > postinst
-  { [ "$(type -t ${script}_prerm)" == "function" ]     && eval echo -n \$${script}_prerm     || __default_prerm;     } > prerm
-    [ "$(type -t ${script}_postrm)" == "function" ]    && eval echo -n \$${script}_postrm                              > postrm
+		chmod +x postinst prerm
+		[ -e postrm ] && chmod +x postrm
 
-  chmod +x postinst prerm
-  [ -e postrm ] && chmod +x postrm
-
-  cat <<CTL > control
+		#region control
+		cat <<CTL > control
 Package: ${script}-static
 Version: $version
 Depends: $(eval echo -n \$${script}_Depends)
@@ -122,47 +208,89 @@ Architecture:
 Installed-Size: $size
 Description: $(eval echo -n "\$${script}_Description")
 CTL
-  sed -e '/^Depends: *$/d' -i control
+		sed -e '/^Depends: *$/d' -i control
+		#endregion
 
-  for arch in arm_cortex-a9 arm_cortex-a53; do
-    [ ! -d $__BASE_DIR/repository/${arch}/packages ] && mkdir -p $__BASE_DIR/repository/${arch}/packages
-    [ ! -e $__BASE_DIR/repository/${arch}/packages/Packages ] && touch $__BASE_DIR/repository/${arch}/packages/Packages
-    if [ -e $__BASE_DIR/repository/${arch}/packages/${script}-static_[^_]*_${arch}.ipk ]; then
-      rm -rf $__BASE_DIR/repository/${arch}/packages/${script}-static_[^_]*_${arch}.ipk
-    fi
-    sed -e "s/^Architecture:.*\$/Architecture: $arch/" -i control
-    make_ipk $arch "${__BASE_DIR}/repository/${arch}/packages/${script}-static_${version}_${arch}.ipk"
-  done
+		[ ! -d $__BASE_DIR/repository/${arch}/packages ] && mkdir -p $__BASE_DIR/repository/${arch}/packages
+		[ ! -e $__BASE_DIR/repository/${arch}/packages/Packages ] && touch $__BASE_DIR/repository/${arch}/packages/Packages
+		[ -e $__BASE_DIR/repository/${arch}/packages/${script}-static_[^_]*_${arch}.ipk ] && rm -rf $__BASE_DIR/repository/${arch}/packages/${script}-static_[^_]*_${arch}.ipk
+		sed -e "s/^Architecture:.*\$/Architecture: $arch/" -i control
+		make_ipk $arch "${__BASE_DIR}/repository/${arch}/packages/${script}-static_${version}_${arch}.ipk"
 
-  [ -e postrm ] && rm postrm
-  
+		[ -e postrm ] && rm postrm
   popd
-}
-
-popd_work_directory() { # Parameters: none
-  popd
-}
-
-pushd_work_directory() { # Parameters: none
-  if [ ! -d .work ]; then
-    mkdir .work
-  fi
-  pushd .work
 }
 
 strip_and_compress() { # Parameters: executable
-  strip -s -R .comment --strip-unneeded $1
-  upx --ultra-brute $1
+	echo -e "${GREY}$(date +%X) ==> DEBUG: $__STRIP -s -R .comment -R .gnu.version --strip-unneeded $1${NC}"
+	$__STRIP -s -R .comment -R .gnu.version --strip-unneeded $1
+	echo -e "${GREY}$(date +%X) ==> DEBUG: $__BASE_DIR/bin/upx --ultra-brute $1${NC}"
+	$__BASE_DIR/bin/upx --ultra-brute $1
 }
 
-check_package git git
-check_package gcc gcc
-check_package make make
-check_package autoreconf autoconf
-check_package automake automake
-check_package upx upx-ucl
-check_dependencies
+echo -e "${GREEN}$(date +%X) ==> INFO:  Discovering scripts....${GREY}[$(pwd)]${NC}"
+[ -z "$*" ] && __SCRIPTS="$(find scripts -maxdepth 1 -type f ! -name README.md -exec basename {} \;)" || __SCRIPTS="$*"
+echo -e "${GREY}$(date +%X) ==> DEBUG: $__SCRIPTS${NC}"
+	
+[ ! -d .work ] && mkdir .work
+pushd .work
+  chmod +x $__BASE_DIR/bin/*
+  for __SCRIPT in $__SCRIPTS; do
+		echo -e "${GREEN}$(date +%X) ==> INFO:  Loading $__SCRIPT....${GREY}[$(pwd)]${NC}"
+		source ../scripts/$__SCRIPT
+    __PATH="$PATH"
+    for I in $(seq 0 $((${#__MUSL_ARCH[@]} - 1))); do
+      __ARCH=${__MUSL_ARCH[$I]}
+			__ARCH_BLD="$(eval echo \$${__SCRIPT}_${__ARCH})"
+			echo -e "${GREY}$(date +%X) ==> DEBUG: ${__SCRIPT}_${__ARCH}=${__ARCH_BLD}${NC}"
+			if [ "$__ARCH_BLD" == "no" ]; then
+					echo -e "${ORANGE}$(date +%X) ==> INFO:  Skipping build of $__SCRIPT for $__ARCH - ${__SCRIPT}_${__ARCH}=no!${GREY}[$(pwd)]${NC}"
+					continue
+			fi
+			echo -e "${GREEN}$(date +%X) ==> INFO:  Initialising $__SCRIPT build for $__ARCH....${GREY}[$(pwd)]${NC}"
+      __TARGET=${__MUSL_PRFX[$I]}
+			if [ -z "$__ARCH_BLD" ]; then
+				export CC="${__TARGET}-gcc"
+				echo -e "${GREY}$(date +%X) ==> DEBUG: CC=$CC${NC}"
+				__BIN_DIR="$(readlink -f $(dirname $(find ../toolchains/ -name "$CC"))/..)/bin"
+				export PATH="$__BIN_DIR:$__PATH"
+				echo -e "${GREY}$(date +%X) ==> DEBUG: PATH=$PATH${NC}"
+				__STRIP="$__BIN_DIR/strip"
+	      [ -x "$__STRIP" ] || __STRIP="$(readlink -f $(find ../toolchains/${__TARGET}* -type f -executable -name '*strip' | head -n 1))"
+			else
+				__STRIP="strip"
+			fi
+      echo -e "${GREY}$(date +%X) ==> DEBUG: STRIP=$__STRIP${NC}"
 
-pushd_work_directory
-main
-popd_work_directory
+			eval ${__SCRIPT}_pushd
+				fetch_latest
+				echo -e "${GREY}$(date +%X) ==> DEBUG: Latest version = $__VERSION${NC}"
+				if [ -e ${__BASE_DIR}/repository/${__OWRT_ARCH[$I]}/packages/${__SCRIPT}-static_${__VERSION}_${__OWRT_ARCH[$I]}.ipk ]; then
+					echo -e "${ORANGE}$(date +%X) ==> INFO:  Skipping build of $__SCRIPT for $__ARCH - Version $__VERSION ipk file already exists!${GREY}[$(pwd)]${NC}"
+				else
+					if [ -x autogen.sh ]; then
+						echo -e "${GREEN}$(date +%X) ==> INFO:  Preparing $__SCRIPT build for $__ARCH....${GREY}[$(pwd)]${NC}"
+						./autogen.sh
+					fi
+					if [ -x configure ]; then
+						echo -e "${GREEN}$(date +%X) ==> INFO:  Configuring $__SCRIPT build for $__ARCH....${GREY}[$(pwd)]${NC}"
+						export FORCE_UNSAFE_CONFIGURE=1
+						export CFLAGS="-static -Os -ffunction-sections -fdata-sections"
+						export LDFLAGS='-Wl,--gc-sections'
+						eval ./configure \$${__SCRIPT}_configure_options --host="${__TARGET}"
+					fi
+					if [ -e Makefile ]; then
+						echo -e "${GREEN}$(date +%X) ==> INFO:  Building $__SCRIPT version $__VERSION for $__ARCH....${GREY}[$(pwd)]${NC}"
+						make clean
+						make $(eval echo -n \$${__SCRIPT}_make_options) -j $__JOBS || exit 2
+					fi
+					eval make_package $__SCRIPT $__VERSION ${__OWRT_ARCH[$I]} \$${__SCRIPT}_binaries
+				fi
+			popd
+      
+      unset CC FORCE_UNSAFE_CONFIGURE CFLAGS LDFLAGS __STRIP __EXE_FILES __ARCH __TARGET
+    done
+    PATH="$__PATH"
+    unset __PATH $(set | grep -o "^${__SCRIPT}_[^$= ]*" | xargs)
+  done
+popd
