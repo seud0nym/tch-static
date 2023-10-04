@@ -1,24 +1,48 @@
-Package: wget-static
-Version: 1.19.5
-Depends: libpcre, zlib, libopenssl, librt
-License: GPL-3.0+
-Section: net
-Architecture: arm_cortex-a53
-Installed-Size: 815292
-Filename: wget-static_1.19.5_arm_cortex-a53.ipk
-Size: 815861
-SHA256sum: b187a044cb8c0c204ba1f47f1ee0fe9b72bc855d846d4b6c3b9965e1b186b712
-Description: Wget is a network utility to retrieve files from the Web using http and ftp, the two most widely used Internet protocols. This package is built with SSL support.
-
 Package: htop-static
 Version: 3.2.2
 Depends: libncurses
 License: GPL-2.0-or-later
 Section: admin
 Architecture: arm_cortex-a53
-Installed-Size: 444040
+Installed-Size: 444864
 Filename: htop-static_3.2.2_arm_cortex-a53.ipk
-Size: 444469
-SHA256sum: 1a54c2dd390366f5c39d821df3dd0acdde203a158702c80bfd0d4e6724f71440
+Size: 445291
+SHA256sum: 322f9c551eb7489024c1c64f53217bd3a7bffde352f69917c743e28d0d70e033
 Description: Htop is an ncursed-based process viewer similar to top, but it allows to scroll the list vertically and horizontally to see all processes and their full command lines.
+
+Package: rsync-static
+Version: 3.2.7
+Depends: zlib
+License: GPL-3.0-or-later
+Section: net
+Architecture: arm_cortex-a53
+Installed-Size: 232188
+Filename: rsync-static_3.2.7_arm_cortex-a53.ipk
+Size: 232781
+SHA256sum: 766d645933dfb4a34dff2acc20a7d233f63d91448fb3539a15f7d47f9d61fa8b
+Description: rsync is a program that allows files to be copied to and from remote machines in much the same way as rcp. It has many more options than rcp, and uses the rsync remote-update protocol to greatly speed up file transfers when the destination file already exists. The rsync remote-update protocol allows rsync to transfer just the differences between two sets of files across the network link.
+
+Package: rsyncd-static
+Version: 3.2.7
+Depends: rsync-static
+License: GPL-3.0-or-later
+Section: net
+Architecture: arm_cortex-a53
+Installed-Size: 573
+Filename: rsyncd-static_3.2.7_arm_cortex-a53.ipk
+Size: 1346
+SHA256sum: 3b1ebc45eccd852223eca1bdd4e57a63b60ca837aef36765e0ea0f943a6f8095
+Description: rsyncd is a configuration file and initscript to utilize rsync as a daemon. It uses the same binary as rsync.
+
+Package: wget-static
+Version: 1.21.4
+Depends: libpcre, zlib, libopenssl, librt
+License: GPL-3.0+
+Section: net
+Architecture: arm_cortex-a53
+Installed-Size: 1621848
+Filename: wget-static_1.21.4_arm_cortex-a53.ipk
+Size: 1622652
+SHA256sum: 003c53f415d25da04e97e031fcdaba494e5a5034d5591f32e40c5489d82085fc
+Description: Wget is a network utility to retrieve files from the Web using http and ftp, the two most widely used Internet protocols. This package is built with SSL support.
 

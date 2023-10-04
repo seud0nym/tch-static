@@ -1,12 +1,35 @@
-Package: wget-static
-Version: 1.19.5
-Depends: libpcre, zlib, libopenssl, librt
-License: GPL-3.0+
+Package: rsync-static
+Version: 3.2.7
+Depends: zlib
+License: GPL-3.0-or-later
 Section: net
 Architecture: arm_cortex-a9
-Installed-Size: 815292
-Filename: wget-static_1.19.5_arm_cortex-a9.ipk
-Size: 815865
-SHA256sum: 61bc15628208905b8e3c17fe6878637ed656a0fd5fa0d747a4f31c17f804c567
-Description: Wget is a network utility to retrieve files from the Web using http and ftp, the two most widely used Internet protocols. This package is built with SSL support.
+Installed-Size: 12569
+Filename: rsync-static_3.2.7_arm_cortex-a9.ipk
+Size: 1042
+SHA256sum: 3699047e679fa1de42cabff2f3d08ccc00314937d9e4dada9a33cd90c0f96f4c
+Description: rsync is a program that allows files to be copied to and from remote machines in much the same way as rcp. It has many more options than rcp, and uses the rsync remote-update protocol to greatly speed up file transfers when the destination file already exists. The rsync remote-update protocol allows rsync to transfer just the differences between two sets of files across the network link.
+
+Package: rsyncd-static
+Version: 3.2.7
+Depends: rsync-static
+License: GPL-3.0-or-later
+Section: net
+Architecture: arm_cortex-a9
+Installed-Size: 573
+Filename: rsyncd-static_3.2.7_arm_cortex-a9.ipk
+Size: 1356
+SHA256sum: fc20e500c8ae07989f5392fcb40a7da4bbbdca8934646dea783fb337f30a741d
+Description: rsyncd is a configuration file and initscript to utilize rsync as a daemon. It uses the same binary as rsync.
+
+Package: iperf3-static
+Version: 3.15
+License: BSD-3-Clause
+Section: net
+Architecture: arm_cortex-a9
+Installed-Size: 272559
+Filename: iperf3-static_3.15_arm_cortex-a9.ipk
+Size: 272321
+SHA256sum: 44f4745acaf651bbb40181a4b6fd116f5e93acd3462954e817a7418a11911fe7
+Description: Iperf is a modern alternative for measuring TCP and UDP bandwidth performance, allowing the tuning of various parameters and characteristics.
 
