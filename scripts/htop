@@ -1,9 +1,17 @@
 #!/bin/bash
 
 # build variables
+htop_master_branch="main"
 htop_binaries="htop"
-htop_version="unknown"
-htop_configure_options="--enable-static --disable-unicode --disable-hwloc --disable-sensors --disable-capabilities --disable-openvz --disable-vserver --disable-ancient-vserver --disable-delayacct"
+htop_configure_options="--enable-static \
+  --disable-unicode \
+  --disable-hwloc \
+  --disable-sensors \
+  --disable-capabilities \
+  --disable-openvz \
+  --disable-vserver \
+  --disable-ancient-vserver \
+  --disable-delayacct"
 htop_make_options=""
 htop_aarch64="$(uname -m | grep -q 'aarch64' && echo gcc)"
 htop_arm="no"
@@ -12,16 +20,21 @@ htop_arm="no"
 htop_Depends="libncurses"
 htop_License="GPL-2.0-or-later"
 htop_Section="admin"
-htop_Maintainer="Etienne CHAMPETIER <champetier.etienne@gmail.com>"
 htop_Description="  Htop is an ncursed-based process viewer similar to top, but
  it allows to scroll the list vertically and horizontally to
  see all processes and their full command lines."
 
+htop_popd() {
+  popd
+}
+
 htop_pushd() {
-  # Clone the repository if the directory does not exist
   if [ ! -d htop ]; then
     git clone --depth 1 https://github.com/htop-dev/htop.git
   fi
-  # ALL {scriptname}_pushd functions MUST end with the pushd command!
   pushd htop
+}
+
+htop_version() {
+  git describe --tags $(git rev-list --tags --max-count=1)
 }

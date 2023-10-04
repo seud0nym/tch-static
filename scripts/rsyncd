@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# build variables
+ryncd_rsync_ipk_version=$(find ../repository -name 'rsync-static_*_*.ipk' -exec basename {} \; | cut -d_ -f2 | sort -u | head -n1)
+if [ -z "$ryncd_rsync_ipk_version" ]; then
+  rsyncd_aarch64="no"
+  rsyncd_arm="no"
+fi
+
+# package variables
+rsyncd_Depends="rsync-static"
+rsyncd_License="GPL-3.0-or-later"
+rsyncd_Section="net"
+rsyncd_Description="  rsyncd is a configuration file and initscript to utilize rsync as a daemon. It uses the same binary as rsync."
+
+rsyncd_add_files() {
+  mkdir -p etc/init.d
+  cat <<-"CONF" > etc/rsyncd.conf
+# /etc/rsyncd.conf
+# Minimal configuration for rsync daemon
+
+# Next line required for init script
+pid file = /var/run/rsyncd.pid
+log file = /var/log/rsyncd.log
+use chroot = yes
+uid = nobody
+gid = nogroup
+read only = yes
+
+# Simple example to configure server
+#[openwrt-etc]
+#path = /etc
+#comment = OpenWrt Configuration Files
+#exclude = /init.d
+CONF
+  cat <<-"INIT" > etc/init.d/rsyncd
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2011-2014 OpenWrt.org
+
+START=90
+STOP=10
+
+USE_PROCD=1
+PROG=/usr/bin/rsync
+
+start_service() {
+	procd_open_instance
+	procd_set_param command "$PROG" --daemon --no-detach
+	procd_close_instance
+}
+INIT
+  chmod +x etc/init.d/rsyncd
+}
+
+rsyncd_conffiles() {
+  echo "/etc/rsyncd.conf"
+}
+
+rsyncd_popd() {
+  popd
+}
+
+rsyncd_pushd() {
+  if [ ! -d rsyncd ]; then
+    mkdir rsyncd
+  fi
+  pushd rsyncd
+}
+
+rsyncd_version() {
+  echo $ryncd_rsync_ipk_version
+}
