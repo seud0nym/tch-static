@@ -67,6 +67,6 @@ rm seud0nym-public.key
 
 Each package to be compiled is configured through a script in the `scripts` folder. Each script must be named the same as the target package, and must contain the required variables and functions prefixed by the script name.
 
-The binaries were built using the `build.sh` script on Debian v11.6 (bullseye) armv5tel processor system. The script checks for and installs required dependencies.
+The binaries were built using the `build.sh` script on a Raspberry Pi Zero 2 W running Debian bookworm (Diet-Pi).
 
 The individual OpenWrt opkg .ipk files are built using an adapted version of the `make-ipk.sh` from https://bitsum.com/creating_ipk_packages.htm, which is executed automatically by `build.sh`.
