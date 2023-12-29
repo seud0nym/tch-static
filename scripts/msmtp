@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# https://marlam.de/msmtp/old-mailinglist/msg00637.html
+
+# build variables
+msmtp_master_branch="master"
+msmtp_binaries="src/msmtp"
+msmtp_configure_options="--without-msmtpd \
+  --disable-nls \
+  --disable-rpath \
+  --with-tls=openssl \
+	--without-libintl-prefix \
+	--without-libgsasl \
+	--without-libidn \
+	--without-libsecret \
+	--without-macosx-keyring \
+	--without-msmtpd"
+msmtp_make_options=""
+msmtp_aarch64="$(uname -m | grep -q 'aarch64' && echo gcc)"
+msmtp_arm="no"
+
+# package variables
+msmtp_Depends="ca-bundle"
+msmtp_License="GPL-3.0-or-later"
+msmtp_Section="mail"
+msmtp_Description="  msmtp is an SMTP client. In the default mode, it transmits a mail to
+ an SMTP server (for example at a free mail provider) which does the
+ delivery. To use this program with your mail user agent (MUA), create
+ a configuration file with your mail account(s) and tell your MUA to
+ call msmtp instead of /usr/sbin/sendmail."
+
+msmtp_popd() {
+  popd
+}
+
+msmtp_pushd() {
+  if [ ! -d msmtp ]; then
+    git clone --depth 1 https://github.com/marlam/msmtp.git
+  fi
+  export LDFLAGS="-Wl,-static -static -static-libgcc"
+  pushd msmtp
+}
+
+msmtp_version() {
+  git describe --tags $(git rev-list --tags --max-count=1)
+}
+
+msmtp_version_number() {
+  echo $__VERSION | cut -d- -f2
+}

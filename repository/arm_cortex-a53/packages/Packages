@@ -57,3 +57,15 @@ Size: 1328754
 SHA256sum: 9eda78077f786bb3cc10c115061d44a4703ffe54831cf379d4af851da691a284
 Description: Iperf is a modern alternative for measuring TCP and UDP bandwidth performance, allowing the tuning of various parameters and characteristics.
 
+Package: msmtp-static
+Version: 1.8.25
+Depends: ca-bundle
+License: GPL-3.0-or-later
+Section: mail
+Architecture: arm_cortex-a53
+Installed-Size: 1502612
+Filename: msmtp-static_1.8.25_arm_cortex-a53.ipk
+Size: 1503520
+SHA256sum: d7d80cba03ea235c9dd0b78bd7620e2a19ff9a2716b6d435db84abfc1cacc38c
+Description: msmtp is an SMTP client. In the default mode, it transmits a mail to an SMTP server (for example at a free mail provider) which does the delivery. To use this program with your mail user agent (MUA), create a configuration file with your mail account(s) and tell your MUA to call msmtp instead of /usr/sbin/sendmail.
+
