@@ -144,6 +144,7 @@ fetch_latest() { # Parameters: none
   if [ -d .git ]; then
     git checkout $__VERSION
   fi
+  [ "$(type -t ${__SCRIPT}_version_number)" == "function" ] && __VERSION=$(eval ${__SCRIPT}_version_number)
 }
 
 make_ipk() {
@@ -174,6 +175,10 @@ make_package() { # Parameters: script version architecture binary [binary ...]
   mkdir -p /tmp/__make_static_package/usr/bin
 
   for binary in $*; do
+    if [ ! -e $binary ]; then
+    	echo -e "${RED}$(date +%X) ==> ERROR: Binary $binary not found! Skipping package build...${GREY}[$(pwd)]${NC}"
+      return
+    fi 
     [ -x $binary ] && strip_and_compress $binary
     cp -p $binary /tmp/__make_static_package/usr/bin/
     chmod +x /tmp/__make_static_package/usr/bin/$(basename $binary)
@@ -306,6 +311,8 @@ pushd .work
           elif [ -x bootstrap ]; then
             ./bootstrap
           elif [ -e configure.ac -a ! -e configure ]; then
+            automake --add-missing
+            autoreconf -fiv
             autoconf
           fi
           if [ -e Makefile.in -a ! -e Makefile ]; then
