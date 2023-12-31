@@ -69,3 +69,15 @@ Size: 1503520
 SHA256sum: d7d80cba03ea235c9dd0b78bd7620e2a19ff9a2716b6d435db84abfc1cacc38c
 Description: msmtp is an SMTP client. In the default mode, it transmits a mail to an SMTP server (for example at a free mail provider) which does the delivery. To use this program with your mail user agent (MUA), create a configuration file with your mail account(s) and tell your MUA to call msmtp instead of /usr/sbin/sendmail.
 
+Package: nano-static
+Version: 7.2
+Depends: libncurses
+License: GPL-3.0-or-later
+Section: utils
+Architecture: arm_cortex-a53
+Installed-Size: 436876
+Filename: nano-static_7.2_arm_cortex-a53.ipk
+Size: 437367
+SHA256sum: f822c6421322f95427c3065526bfbb3e4c508833ffea7e168c82b5304b672974
+Description: Nano is a small and simple text editor for use on the terminal. Nano started as an enhanced clone of the Pico text editor. Nowadays Nano wants to be a generally useful editor with sensible defaults (linewise scrolling, no automatic line breaking). Nano is an official GNU package.
+

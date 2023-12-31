@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# build variables
+nano_master_branch="master"
+nano_binaries="src/nano"
+nano_configure_options="--enable-tiny --enable-linenumbers"
+nano_make_options=""
+nano_aarch64="$(uname -m | grep -q 'aarch64' && echo gcc)"
+nano_arm="no"
+
+# package variables
+nano_Depends="libncurses"
+nano_License="GPL-3.0-or-later"
+nano_Section="utils"
+nano_Description="  Nano is a small and simple text editor for use on the terminal.
+
+  Nano started as an enhanced clone of the Pico text editor.
+  Nowadays Nano wants to be a generally useful editor with sensible
+  defaults (linewise scrolling, no automatic line breaking).
+
+  Nano is an official GNU package."
+
+nano_popd() {
+  popd
+}
+
+nano_pushd() {
+  if [ ! -d nano ]; then
+    git clone --depth 1 https://git.savannah.gnu.org/git/nano.git
+  fi
+  export CFLAGS="-O2 -Wall --static"
+  pushd nano
+}
+
+nano_version() {
+  git describe --tags $(git rev-list --tags --max-count=1)
+}
