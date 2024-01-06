@@ -6,8 +6,8 @@ Section: net
 Architecture: arm_cortex-a9
 Installed-Size: 12569
 Filename: rsync-static_3.2.7_arm_cortex-a9.ipk
-Size: 1042
-SHA256sum: 3699047e679fa1de42cabff2f3d08ccc00314937d9e4dada9a33cd90c0f96f4c
+Size: 205531
+SHA256sum: 6ff8af83ab4054270f9cfe185c91b55db951a7607a6737cbb24a784368131c65
 Description: rsync is a program that allows files to be copied to and from remote machines in much the same way as rcp. It has many more options than rcp, and uses the rsync remote-update protocol to greatly speed up file transfers when the destination file already exists. The rsync remote-update protocol allows rsync to transfer just the differences between two sets of files across the network link.
 
 Package: rsyncd-static
@@ -18,8 +18,8 @@ Section: net
 Architecture: arm_cortex-a9
 Installed-Size: 573
 Filename: rsyncd-static_3.2.7_arm_cortex-a9.ipk
-Size: 1356
-SHA256sum: fc20e500c8ae07989f5392fcb40a7da4bbbdca8934646dea783fb337f30a741d
+Size: 1345
+SHA256sum: 4c76e2a19df7bc14004519b3aee82f5a4d4f06fb8752b6ca735451f57c662e0d
 Description: rsyncd is a configuration file and initscript to utilize rsync as a daemon. It uses the same binary as rsync.
 
 Package: iperf3-static
