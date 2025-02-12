@@ -1,83 +1,84 @@
+
 Package: htop-static
-Version: 3.2.2
+Version: 3.3.0
 Depends: libncurses
 License: GPL-2.0-or-later
 Section: admin
 Architecture: arm_cortex-a53
-Installed-Size: 444864
-Filename: htop-static_3.2.2_arm_cortex-a53.ipk
-Size: 445291
-SHA256sum: 322f9c551eb7489024c1c64f53217bd3a7bffde352f69917c743e28d0d70e033
+Installed-Size: 450300
+Filename: htop-static_3.3.0_arm_cortex-a53.ipk
+Size: 450810
+SHA256sum: 373f7802aafd31087fde9579de237bd283d4ca419540da90807f46cb07eb7e51
 Description: Htop is an ncursed-based process viewer similar to top, but it allows to scroll the list vertically and horizontally to see all processes and their full command lines.
 
+Package: iperf3-static
+Version: 3.18+
+License: BSD-3-Clause
+Section: net
+Architecture: arm_cortex-a53
+Installed-Size: 1342127
+Filename: iperf3-static_3.18+_arm_cortex-a53.ipk
+Size: 1342457
+SHA256sum: 382e0f3bb64131e4b64f4b2bad3d3b86a94d948889ee0314b10ec5756e223da5
+Description: Iperf is a modern alternative for measuring TCP and UDP bandwidth performance, allowing the tuning of various parameters and characteristics.
+
+Package: msmtp-static
+Version: 1.8.28
+Depends: ca-bundle
+License: GPL-3.0-or-later
+Section: mail
+Architecture: arm_cortex-a53
+Installed-Size: 1505232
+Filename: msmtp-static_1.8.28_arm_cortex-a53.ipk
+Size: 1506168
+SHA256sum: 6e0ca854714fe9798f89adea17ec4b97a739b95835001502ec9f8ca3ed02f43a
+Description: msmtp is an SMTP client. In the default mode, it transmits a mail to an SMTP server (for example at a free mail provider) which does the delivery. To use this program with your mail user agent (MUA), create a configuration file with your mail account(s) and tell your MUA to call msmtp instead of /usr/sbin/sendmail.
+
+Package: nano-static
+Version: 8.3
+Depends: libncurses
+License: GPL-3.0-or-later
+Section: utils
+Architecture: arm_cortex-a53
+Installed-Size: 440404
+Filename: nano-static_8.3_arm_cortex-a53.ipk
+Size: 440916
+SHA256sum: 3cbfa89f5f5be2cea327bb0b2e34264a093e7e94fac3efb60f3cde429e9b2382
+Description: Nano is a small and simple text editor for use on the terminal. Nano started as an enhanced clone of the Pico text editor. Nowadays Nano wants to be a generally useful editor with sensible defaults (linewise scrolling, no automatic line breaking). Nano is an official GNU package.
+
 Package: rsync-static
-Version: 3.2.7
+Version: 3.4.1
 Depends: zlib
 License: GPL-3.0-or-later
 Section: net
 Architecture: arm_cortex-a53
-Installed-Size: 232188
-Filename: rsync-static_3.2.7_arm_cortex-a53.ipk
-Size: 232781
-SHA256sum: 766d645933dfb4a34dff2acc20a7d233f63d91448fb3539a15f7d47f9d61fa8b
+Installed-Size: 235808
+Filename: rsync-static_3.4.1_arm_cortex-a53.ipk
+Size: 236206
+SHA256sum: c67e8436c1dc6ba438dbf272e8d44834bc3d7521ba91466710ae08874cbbe3e7
 Description: rsync is a program that allows files to be copied to and from remote machines in much the same way as rcp. It has many more options than rcp, and uses the rsync remote-update protocol to greatly speed up file transfers when the destination file already exists. The rsync remote-update protocol allows rsync to transfer just the differences between two sets of files across the network link.
 
 Package: rsyncd-static
-Version: 3.2.7
+Version: 3.4.1
 Depends: rsync-static
 License: GPL-3.0-or-later
 Section: net
 Architecture: arm_cortex-a53
 Installed-Size: 573
-Filename: rsyncd-static_3.2.7_arm_cortex-a53.ipk
-Size: 1346
-SHA256sum: 3b1ebc45eccd852223eca1bdd4e57a63b60ca837aef36765e0ea0f943a6f8095
+Filename: rsyncd-static_3.4.1_arm_cortex-a53.ipk
+Size: 1348
+SHA256sum: cf38ef3e97488df98454d78ab7128996374acdd6221b0abb004ca557180aaf6e
 Description: rsyncd is a configuration file and initscript to utilize rsync as a daemon. It uses the same binary as rsync.
 
 Package: wget-static
-Version: 1.21.4
+Version: 1.25.0
 Depends: libpcre, zlib, libopenssl, librt
 License: GPL-3.0+
 Section: net
 Architecture: arm_cortex-a53
-Installed-Size: 1621848
-Filename: wget-static_1.21.4_arm_cortex-a53.ipk
-Size: 1622652
-SHA256sum: 003c53f415d25da04e97e031fcdaba494e5a5034d5591f32e40c5489d82085fc
+Installed-Size: 1635776
+Filename: wget-static_1.25.0_arm_cortex-a53.ipk
+Size: 1636697
+SHA256sum: dd19c58d56cf0ec3f71f4337729f0e372db9ccb8baf6ad303fa0b44de12645c9
 Description: Wget is a network utility to retrieve files from the Web using http and ftp, the two most widely used Internet protocols. This package is built with SSL support.
-
-Package: iperf3-static
-Version: 3.15
-License: BSD-3-Clause
-Section: net
-Architecture: arm_cortex-a53
-Installed-Size: 1328507
-Filename: iperf3-static_3.15_arm_cortex-a53.ipk
-Size: 1328754
-SHA256sum: 9eda78077f786bb3cc10c115061d44a4703ffe54831cf379d4af851da691a284
-Description: Iperf is a modern alternative for measuring TCP and UDP bandwidth performance, allowing the tuning of various parameters and characteristics.
-
-Package: msmtp-static
-Version: 1.8.25
-Depends: ca-bundle
-License: GPL-3.0-or-later
-Section: mail
-Architecture: arm_cortex-a53
-Installed-Size: 1502612
-Filename: msmtp-static_1.8.25_arm_cortex-a53.ipk
-Size: 1503520
-SHA256sum: d7d80cba03ea235c9dd0b78bd7620e2a19ff9a2716b6d435db84abfc1cacc38c
-Description: msmtp is an SMTP client. In the default mode, it transmits a mail to an SMTP server (for example at a free mail provider) which does the delivery. To use this program with your mail user agent (MUA), create a configuration file with your mail account(s) and tell your MUA to call msmtp instead of /usr/sbin/sendmail.
-
-Package: nano-static
-Version: 7.2
-Depends: libncurses
-License: GPL-3.0-or-later
-Section: utils
-Architecture: arm_cortex-a53
-Installed-Size: 436876
-Filename: nano-static_7.2_arm_cortex-a53.ipk
-Size: 437367
-SHA256sum: f822c6421322f95427c3065526bfbb3e4c508833ffea7e168c82b5304b672974
-Description: Nano is a small and simple text editor for use on the terminal. Nano started as an enhanced clone of the Pico text editor. Nowadays Nano wants to be a generally useful editor with sensible defaults (linewise scrolling, no automatic line breaking). Nano is an official GNU package.
 
