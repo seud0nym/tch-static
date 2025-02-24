@@ -82,3 +82,19 @@ Size: 1636697
 SHA256sum: dd19c58d56cf0ec3f71f4337729f0e372db9ccb8baf6ad303fa0b44de12645c9
 Description: Wget is a network utility to retrieve files from the Web using http and ftp, the two most widely used Internet protocols. This package is built with SSL support.
 
+Package: wsdd2-static
+Version: 1.8.7
+License: GPL-3.0-only
+Section: net
+Architecture: arm_cortex-a53
+Installed-Size: 56506
+Filename: wsdd2-static_1.8.7_arm_cortex-a53.ipk
+Size: 56854
+SHA256sum: ea3752c7593e2cda4ab901e3146fff25cbcd4a23874c3f6a2fb0d53604d9e0a4
+Description:   Web Services for Devices or Web Services on Devices (WSD),
+  is a Microsoft API to simplify programming connections to web service
+  enabled devices, such as printers, scanners and file shares.
+
+  This daemon advertises and responds to probe requests from Windows clients looking for file shares.
+  It also implements LLMNR multicast name lookup services.
+

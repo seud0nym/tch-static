@@ -1,0 +1,138 @@
+#!/bin/bash
+
+# build variables
+wsdd2_master_branch="master"
+wsdd2_binaries="wsdd2"
+wsdd2_configure_options=""
+wsdd2_make_options=""
+
+# package variables
+wsdd2_License="GPL-3.0-only"
+wsdd2_Section="net"
+wsdd2_Description="  Web Services for Devices or Web Services on Devices (WSD),
+  is a Microsoft API to simplify programming connections to web service
+  enabled devices, such as printers, scanners and file shares.
+
+  This daemon advertises and responds to probe requests from Windows clients looking for file shares.
+  It also implements LLMNR multicast name lookup services."
+
+wsdd2_add_files() {
+  mkdir -p etc/config
+  cat <<-"CONF" > etc/config/wsdd2
+config wsdd2 'global'
+        option vendor ''
+        option model ''
+        option serial ''
+        option host_name ''
+        option netbios_name ''
+        option workgroup ''
+config wsdd 'wsdd'
+        option debug '0'
+CONF
+  mkdir -p etc/init.d
+  cat <<-"INIT" > etc/init.d/wsdd2
+#!/bin/sh /etc/rc.common
+
+START=80
+STOP=30
+USE_PROCD=1
+
+. $IPKG_INSTROOT/lib/functions.sh
+
+start_service() {
+  local enabled=$(uci_get samba samba enabled 0)
+  local filesharing=$(uci_get samba samba filesharing 0)
+  local printersharing=$(uci_get samba printers enabled 0)
+
+  [ "$enabled" = "1" -a \( "$filesharing" = "1" -o "$printsharing" = "1" \) ] || return
+
+  local params="-w"
+
+  local host_name=$(uci_get wsdd2 global host_name)
+  [ -n "$host_name" ] && params="$params -H '$host_name'"
+
+  local netbios_name=$(uci_get wsdd2 global netbios_name)
+  [ -n "$netbios_name" ] && params="$params -N '$netbios_name'"
+
+  local workgroup=$(uci_get wsdd2 global workgroup)
+  [ -n "$workgroup" ] && params="$params -G '$workgroup'"
+
+  local bootparam=""
+  local vendor=$(uci_get wsdd2 global vendor)
+  local model=$(uci_get wsdd2 global model)
+  local serial=$(uci_get wsdd2 global serial)
+  [ -n "$vendor" ] && bootparam="$bootparam,vendor:$vendor"
+  [ -n "$model" ] && bootparam="$bootparam,model:$model"
+  [ -n "$serial" ] && bootparam="$bootparam,serial:$serial"
+  [ -n "$bootparam" ] && params="$params -b $(echo $bootparam | cut -c2-)"
+
+  local i=$(uci_get wsdd2 wsdd debug 0)
+  while [ $i -gt 0 ]; do
+    params="$params -W"
+    i=$(( $i - 1 ))
+  done
+
+  procd_open_instance
+  procd_set_param command /usr/bin/wsdd2 $params
+  procd_set_param respawn 60, 60, 0
+  procd_set_param stdout 1
+  procd_set_param stderr 1
+  procd_close_instance
+}
+INIT
+  chmod +x etc/init.d/wsdd2
+}
+
+wsdd2_conffiles() {
+  echo "/etc/config/wsdd2"
+}
+
+wsdd2_postinst() {
+  cat <<"PI"
+#!/bin/sh
+. /lib/config/uci.sh
+[ -e /etc/machine-id ] || echo -n "abcd$(uci get env.rip.eth_mac | tr -d : | tr A-F a-f)">/etc/machine-id
+uci_set wsdd2 global vendor "$(uci_get env var prod_name)"
+uci_set wsdd2 global model "$(uci_get env var prod_number)"
+uci_set wsdd2 global serial "$(uci_get env var serial)"
+uci_commit
+/etc/init.d/wsdd2 enable
+/etc/init.d/wsdd2 start
+sed -e 's|/etc/init.d/samba restart|&; /etc/init.d/wsdd2 restart|' -i /usr/share/transformer/commitapply/uci_samba.ca
+exit 0
+PI
+}
+
+wsdd2_postrm() {
+  cat <<"PR"
+#!/bin/sh
+[ -e /etc/machine-id ] && grep -q "^abcd" /etc/machine-id && rm /etc/machine-id
+sed -e 's|; /etc/init.d/wsdd2 restart||' -i /usr/share/transformer/commitapply/uci_samba.ca
+exit 0
+PR
+}
+
+wsdd2_prerm() {
+  cat <<"PR"
+#!/bin/sh
+/etc/init.d/wsdd2 stop
+/etc/init.d/wsdd2 disable
+exit 0
+PR
+}
+
+wsdd2_popd() {
+  popd
+}
+
+wsdd2_pushd() {
+  if [ ! -d wsdd2 ]; then
+    git clone --depth 1 https://github.com/Netgear/wsdd2.git
+  fi
+  export LDFLAGS="-static -static-libgcc -static-libstdc++"
+  pushd wsdd2
+}
+
+wsdd2_version() {
+  git describe --tags $(git rev-list --tags --max-count=1)
+}

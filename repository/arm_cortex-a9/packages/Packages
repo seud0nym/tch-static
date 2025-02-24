@@ -33,3 +33,19 @@ Size: 1347
 SHA256sum: b84a63be64f598ff849923e15a2d8247769e63a148406b5e9bf2f19c5a677f78
 Description: rsyncd is a configuration file and initscript to utilize rsync as a daemon. It uses the same binary as rsync.
 
+Package: wsdd2-static
+Version: 1.8.7
+License: GPL-3.0-only
+Section: net
+Architecture: arm_cortex-a9
+Installed-Size: 52846
+Filename: wsdd2-static_1.8.7_arm_cortex-a9.ipk
+Size: 52891
+SHA256sum: b0a5bcd5bf7458c06adbc2e440a91ca404f85b7c5922ee1216199c266f3f7390
+Description:   Web Services for Devices or Web Services on Devices (WSD),
+  is a Microsoft API to simplify programming connections to web service
+  enabled devices, such as printers, scanners and file shares.
+
+  This daemon advertises and responds to probe requests from Windows clients looking for file shares.
+  It also implements LLMNR multicast name lookup services.
+
