@@ -186,10 +186,10 @@ make_package() { # Parameters: script version architecture binary [binary ...]
 
   pushd /tmp/__make_static_package
 		echo "2.0" > debian_binary
-		{ [ "$(type -t ${script}_conffiles)" == "function" ] && eval echo -n \$${script}_conffiles || __default_conffiles; } > conffiles
-		{ [ "$(type -t ${script}_postinst)" == "function" ]  && eval echo -n \$${script}_postinst  || __default_postinst;  } > postinst
-		{ [ "$(type -t ${script}_prerm)" == "function" ]     && eval echo -n \$${script}_prerm     || __default_prerm;     } > prerm
-			[ "$(type -t ${script}_postrm)" == "function" ]    && eval echo -n \$${script}_postrm                              > postrm
+		{ [ "$(type -t ${script}_conffiles)" == "function" ] && eval printf \""\$(${script}_conffiles)"\" || __default_conffiles; } > conffiles
+		{ [ "$(type -t ${script}_postinst)" == "function" ]  && eval printf \""\$(${script}_postinst)"\"  || __default_postinst;  } > postinst
+		{ [ "$(type -t ${script}_prerm)" == "function" ]     && eval printf \""\$(${script}_prerm)"\"     || __default_prerm;     } > prerm
+			[ "$(type -t ${script}_postrm)" == "function" ]    && eval printf \""\$(${script}_postrm)"\"                              > postrm
 			[ "$(type -t ${script}_add_files)" == "function" ] && eval ${script}_add_files
 
 		chmod +x postinst prerm
@@ -199,12 +199,12 @@ make_package() { # Parameters: script version architecture binary [binary ...]
 		cat <<CTL > control
 Package: ${script}-static
 Version: $version
-Depends: $(eval echo -n \$${script}_Depends)
-License: $(eval echo -n \$${script}_License)
-Section: $(eval echo -n \$${script}_Section)
+Depends: $(eval printf \""\$${script}_Depends"\")
+License: $(eval printf \""\$${script}_License"\")
+Section: $(eval printf \""\$${script}_Section"\")
 Architecture: 
 Installed-Size: $(du -c --bytes $(find . -mindepth 2 -type f) | tail -n1 | cut -f1)
-Description: $(eval echo -n "\$${script}_Description")
+Description: $(eval printf \""\$${script}_Description"\")
 CTL
 		sed -e '/^Depends: *$/d' -i control
 		#endregion
