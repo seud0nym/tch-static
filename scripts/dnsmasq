@@ -1,0 +1,177 @@
+#!/bin/bash
+#
+# Static dnsmasq for arm_cortex-a9 (e.g. DJA0230, BCM63138) and arm_cortex-a53
+# (e.g. Telstra Smart Modem Gen 3 / VCNT-8, BCM63146). The Gen 3 runs an aarch64
+# 4.19 kernel with a mostly 32-bit ARM userland (its stock dnsmasq, ubusd and
+# BusyBox are 32-bit); the aarch64 static binary needs none of it, and talks to
+# the stock ubusd over its socket. Both devices ship the same dnsmasq-full
+# 2.83-1 feature string, init script and libubus/libubox commits.
+#
+# Unlike the other recipes this one is pinned: every input is a release
+# tarball with a recorded SHA-256, and the compile-time options are chosen to
+# match the stock "dnsmasq-full 2.83-1" feature string, so that the stock
+# /etc/init.d/dnsmasq feature probe (dnsmasq --version) makes the same choices:
+#
+#   stock : IPv6 GNU-getopt no-RTC no-DBus UBus no-i18n no-IDN DHCP no-DHCPv6
+#           no-Lua TFTP conntrack dns-filter no-ipset no-auth no-nettlehash
+#           no-DNSSEC loop-detect inotify dumpfile
+#
+# "dns-filter" marks Technicolor additions that upstream dnsmasq, and so this
+# build, does not have: --dns-filter (the stock init script emits it for UCI
+# dhcp.dnsrule sections), --sticky-servers (UCI sticky_servers), the
+# "# dnsset:" nameserver tag netifd writes for interfaces with option dnsset,
+# vendor-class/option-50 pool checks and DHCP host name de-duplication. Their
+# source has not been published. dnsmasq 2.93 refuses the two options, so do
+# not use this binary in place of /usr/sbin/dnsmasq on a router that has a
+# dnsrule or sticky_servers: the instance would not start (no DNS or DHCP).
+# Check with: uci -q show dhcp | grep -E '=dnsrule$|sticky_servers='
+#
+# Static dependencies: libubus + libubox (pinned to the stock OpenWrt commits,
+# socket /var/run/ubus.sock) for --enable-ubus, and libnetfilter_conntrack +
+# libnfnetlink + libmnl for --conntrack (used by the stock /etc/dnsmasq.conf).
+#
+# Both fork toolchains are used: arm (cortex-a9, soft-float EABI) and aarch64
+# (cortex-a53). The binary is a static PIE (ASLR, like the stock PIE build),
+# which needs a toolchain whose libc.a is PIC: build musl-cross-make with the
+# pinned configs config/musl-cross-make-arm-cortex-a9.mak and
+# config/musl-cross-make-aarch64-cortex-a53.mak (both --enable-default-pie).
+# build.sh builds each toolchain from the config whose TARGET matches, and
+# rebuilds an existing toolchain that was not built from it.
+#
+# Build host requirements beyond build.sh's: pkg-config (dnsmasq's Makefile
+# finds the static libraries through it), and xz and bzip2 for the tarballs.
+#
+# Downloads are cached in $DNSMASQ_DL_DIR (default: $PWD/dl, i.e. .work/dl
+# under build.sh) and are always checked against the SHA-256 values below.
+# Through build.sh the package installs /usr/bin/dnsmasq (UPX-compressed);
+# it does not replace the stock /usr/sbin/dnsmasq.
+
+# build variables
+# (Both dnsmasq_arm and dnsmasq_aarch64 are left unset so build.sh builds both
+# architectures with their cross toolchains, matching the fork's dual-arch norm.)
+dnsmasq_binaries="src/dnsmasq"
+dnsmasq_version_pin="2.93"
+dnsmasq_sources="
+https://thekelleys.org.uk/dnsmasq/dnsmasq-2.93.tar.xz 0c00d4e5c97c8306e5fb932b348b34269c9c29a0e7df0e8e82958b407092bc19
+https://www.netfilter.org/pub/libmnl/libmnl-1.0.5.tar.bz2 274b9b919ef3152bfb3da3a13c950dd60d6e2bcd54230ffeca298d03b40d0525
+https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2 b064c7c3d426efb4786e60a8e6859b82ee2f2c5e49ffeea640cfe4fe33cbc376
+https://www.netfilter.org/pub/libnetfilter_conntrack/libnetfilter_conntrack-1.1.1.tar.xz 769d3eaf57fa4fbdb05dd12873b6cb9a5be7844d8937e222b647381d44284820
+https://sources.openwrt.org/libubox-2020-02-27-7da66430.tar.xz f3b5c23280016bbe4b825de81cd455507ca817f599c5cd9f888370d9a33f6c9e
+https://sources.openwrt.org/ubus-2020-01-05-d35df8ad.tar.xz bbe69a7b7df98310f6a6dba344b6190f4ba3ebcc6333b9c4b884feda0a7470e6
+"
+# Stock parity: HAVE_BROKEN_RTC ("no-RTC", lease file stores lease length),
+# UBus, conntrack, no DHCPv6 (odhcpd serves DHCPv6/RA), no ipset, no auth.
+dnsmasq_copts="-DHAVE_UBUS -DHAVE_CONNTRACK -DHAVE_BROKEN_RTC -DNO_DHCP6 -DNO_IPSET -DNO_AUTH"
+# build.sh expands this once (eval make \$dnsmasq_make_options), without quote
+# removal, so pass make variable references that make expands from the
+# DNSMASQ_* environment set in dnsmasq_pushd. CC is the exported cross compiler.
+dnsmasq_make_options='PKG_CONFIG=$(DNSMASQ_SYSROOT)/bin/pkg-config COPTS=$(DNSMASQ_COPTS) CFLAGS=$(DNSMASQ_CFLAGS) LDFLAGS=$(DNSMASQ_LDFLAGS) LIBS=-lubox'
+
+# package variables
+dnsmasq_License="GPL-2.0-only OR GPL-3.0-only"
+dnsmasq_Section="net"
+dnsmasq_Description="  Statically linked dnsmasq (DNS forwarder and DHCPv4 server) with UBus and
+ conntrack support, compile options matched to the stock dnsmasq-full.
+ Installs as /usr/bin/dnsmasq and does NOT replace the stock /usr/sbin/dnsmasq."
+
+dnsmasq_arch_flags() { # Parameters: none. Sets dnsmasq_target and dnsmasq_cpu_flags from $CC.
+  # build.sh exports CC=<target>-gcc per architecture; the offline driver sets
+  # it too. Derive the musl target triple and per-arch codegen flags from it.
+  dnsmasq_target="${CC##*/}"; dnsmasq_target="${dnsmasq_target%-gcc}"
+  case "$dnsmasq_target" in
+    arm-*)     dnsmasq_cpu_flags="-mcpu=cortex-a9 -marm -mfloat-abi=soft";;
+    aarch64-*) dnsmasq_cpu_flags="-mcpu=cortex-a53";;
+    *) echo "dnsmasq: unsupported target '$dnsmasq_target' (CC=$CC)" 1>&2; return 2;;
+  esac
+}
+
+dnsmasq_fetch() { # Parameters: none. Downloads and verifies every pinned source.
+  local url sum file
+  mkdir -p "$DNSMASQ_DL_DIR" || return 1
+  echo "$dnsmasq_sources" | while read -r url sum; do
+    [ -z "$url" ] && continue
+    file="$DNSMASQ_DL_DIR/$(basename "$url")"
+    if [ ! -e "$file" ]; then
+      curl -sSfL -o "$file.tmp" "$url" && mv "$file.tmp" "$file" || { rm -f "$file.tmp"; return 1; }
+    fi
+    echo "$sum  $file" | sha256sum -c --quiet - || { echo "SHA-256 mismatch: $file" 1>&2; return 1; }
+  done
+}
+
+dnsmasq_unpack() { # Parameters: tarball-basename. Fresh extraction into the cwd.
+  local dir
+  dir="$(tar -tf "$DNSMASQ_DL_DIR/$1" | head -n 1 | cut -d/ -f1)"
+  rm -rf "$dir"
+  tar -xf "$DNSMASQ_DL_DIR/$1" || return 1
+  echo "$dir"
+}
+
+dnsmasq_build_deps() { # Parameters: none. Builds static PIE dependency libraries into $DNSMASQ_SYSROOT.
+  local dir src
+  local cflags="-Os -fPIE -ffunction-sections -fdata-sections -g0 $dnsmasq_cpu_flags -ffile-prefix-map=$PWD=/build"
+  rm -rf "$DNSMASQ_SYSROOT"
+  mkdir -p "$DNSMASQ_SYSROOT/bin" "$DNSMASQ_SYSROOT/include/libubox" "$DNSMASQ_SYSROOT/lib/pkgconfig"
+  # dnsmasq's bld/pkg-wrapper takes PKG_CONFIG as a single word, so wrap --static.
+  printf '#!/bin/sh\nexec pkg-config --static "$@"\n' > "$DNSMASQ_SYSROOT/bin/pkg-config"
+  chmod 755 "$DNSMASQ_SYSROOT/bin/pkg-config"
+
+  for src in libmnl-1.0.5.tar.bz2 libnfnetlink-1.0.2.tar.bz2 libnetfilter_conntrack-1.1.1.tar.xz; do
+    dir="$(dnsmasq_unpack $src)" || return 1
+    pushd "$dir" > /dev/null
+      PKG_CONFIG_LIBDIR="$DNSMASQ_SYSROOT/lib/pkgconfig" PKG_CONFIG_PATH= \
+        ./configure --host=$dnsmasq_target --prefix="$DNSMASQ_SYSROOT" \
+          --enable-static --disable-shared CC="$CC" CFLAGS="$cflags" > configure.log 2>&1 || { cat configure.log; return 1; }
+      make -j ${__JOBS:-4} install > make.log 2>&1 || { cat make.log; return 1; }
+    popd > /dev/null
+  done
+
+  # libubox and libubus: same source lists as their CMakeLists.txt, without
+  # json-c, Lua or examples (dnsmasq only needs the core libraries).
+  dir="$(dnsmasq_unpack libubox-2020-02-27-7da66430.tar.xz)" || return 1
+  pushd "$dir" > /dev/null
+    for src in avl.c avl-cmp.c blob.c blobmsg.c uloop.c usock.c ustream.c ustream-fd.c vlist.c utils.c safe_list.c runqueue.c md5.c kvlist.c ulog.c base64.c; do
+      $CC $cflags -std=gnu99 -Wall -iquote . -c $src -o ${src%.c}.o || return 1
+    done
+    $AR rcD "$DNSMASQ_SYSROOT/lib/libubox.a" *.o && $RANLIB -D "$DNSMASQ_SYSROOT/lib/libubox.a" || return 1
+    cp -p *.h "$DNSMASQ_SYSROOT/include/libubox/"
+  popd > /dev/null
+
+  dir="$(dnsmasq_unpack ubus-2020-01-05-d35df8ad.tar.xz)" || return 1
+  pushd "$dir" > /dev/null
+    for src in libubus.c libubus-io.c libubus-obj.c libubus-sub.c libubus-req.c libubus-acl.c; do
+      $CC $cflags -std=gnu99 -Wall -iquote . -I"$DNSMASQ_SYSROOT/include" \
+        -DUBUS_UNIX_SOCKET=\"/var/run/ubus.sock\" -DUBUS_MAX_MSGLEN=1048576 -c $src -o ${src%.c}.o || return 1
+    done
+    $AR rcD "$DNSMASQ_SYSROOT/lib/libubus.a" libubus*.o && $RANLIB -D "$DNSMASQ_SYSROOT/lib/libubus.a" || return 1
+    cp -p libubus.h ubusmsg.h ubus_common.h "$DNSMASQ_SYSROOT/include/"
+  popd > /dev/null
+}
+
+dnsmasq_popd() {
+  popd
+  unset DNSMASQ_CFLAGS DNSMASQ_LDFLAGS DNSMASQ_COPTS PKG_CONFIG_LIBDIR PKG_CONFIG_PATH AR RANLIB dnsmasq_target dnsmasq_cpu_flags
+}
+
+dnsmasq_pushd() {
+  export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1780531200}" # 2026-06-04, dnsmasq 2.93 release day
+  export DNSMASQ_DL_DIR="${DNSMASQ_DL_DIR:-$PWD/dl}"
+  export DNSMASQ_SYSROOT="$PWD/dnsmasq-sysroot"
+  export CC="${CC:-arm-linux-musleabi-gcc}" AR="${CC%gcc}ar" RANLIB="${CC%gcc}ranlib"
+  export PKG_CONFIG_LIBDIR="$DNSMASQ_SYSROOT/lib/pkgconfig" PKG_CONFIG_PATH= DNSMASQ_COPTS="$dnsmasq_copts"
+  dnsmasq_arch_flags || exit 2
+  command -v pkg-config > /dev/null || { echo "dnsmasq: pkg-config is required on the build host" 1>&2; exit 2; }
+  dnsmasq_fetch || exit 2
+  dnsmasq_build_deps || exit 2
+  local dir
+  dir="$(dnsmasq_unpack dnsmasq-${dnsmasq_version_pin}.tar.xz)" || exit 2
+  export DNSMASQ_CFLAGS="-Os -fPIE -fstack-protector-strong -ffunction-sections -fdata-sections -g0 $dnsmasq_cpu_flags -I$DNSMASQ_SYSROOT/include -ffile-prefix-map=$PWD=/build -Wall -W"
+  # gcc 11's arm LINK_SPEC has no -static-pie mapping (it would link libc.so
+  # without an interpreter), so spell static PIE out: rcrt1.o + -Bstatic + -pie.
+  # The same explicit form is correct on aarch64.
+  export DNSMASQ_LDFLAGS="-static -pie -Wl,--no-dynamic-linker -Wl,-z,text -Wl,--gc-sections -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -L$DNSMASQ_SYSROOT/lib"
+  pushd "$dir"
+}
+
+dnsmasq_version() {
+  echo "$dnsmasq_version_pin"
+}
