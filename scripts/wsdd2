@@ -1,10 +1,20 @@
 #!/bin/bash
 
 # build variables
-wsdd2_master_branch="master"
 wsdd2_binaries="wsdd2"
 wsdd2_configure_options=""
 wsdd2_make_options=""
+
+# github.com/Netgear/wsdd2 no longer exists. Build the commit OpenWrt ships (b676d8ac, 2023-12-21) from the OpenWrt
+# source mirror, checked by SHA-256, with the fixes from openwrt/packages#30347 (NULL write in wsd_parse_http_header,
+# out-of-bounds read in llmnr_send_response), oldium/wsdd2#1 (-b vendor/model/serial parsing) and OpenWrt's
+# 010-gcc14.patch (msghdr initializer) applied below.
+wsdd2_commit="b676d8ac8f1aef792cb0761fb68a0a589ded3207"
+wsdd2_archive_url="https://sources.openwrt.org/wsdd2-2023.12.21~b676d8ac.tar.xz"
+wsdd2_archive_sha256="b2fce1e0ff9d9bb96012b7abc54c03571026e17d87edb67bd26c9a7fcfcc5283"
+# opkg must sort this above 1.8.7. Change it (date of the commit, or add .1, .2, ...) whenever the source or the
+# fixes below change.
+wsdd2_pkg_version="1.8.7+git20231221"
 
 # package variables
 wsdd2_License="GPL-3.0-only"
@@ -126,13 +136,139 @@ wsdd2_popd() {
 }
 
 wsdd2_pushd() {
-  if [ ! -d wsdd2 ]; then
-    git clone --depth 1 https://github.com/Netgear/wsdd2.git
+  # A wsdd2 directory from an earlier build (such as a clone of the old Netgear repository) is replaced unless it
+  # was prepared by this recipe for this version. The source is extracted and patched in wsdd2.new, and only
+  # moved to wsdd2 when both steps succeed.
+  if [ "$(cat wsdd2/.tch-static-version 2>/dev/null)" != "$wsdd2_pkg_version" ]; then
+    rm -rf wsdd2 wsdd2.new wsdd2.tar.xz
+    echo "Fetching wsdd2 $wsdd2_commit from the OpenWrt source mirror..."
+    curl -fsSL -o wsdd2.tar.xz "$wsdd2_archive_url" || { echo "ERROR: failed to download $wsdd2_archive_url"; exit 2; }
+    echo "$wsdd2_archive_sha256  wsdd2.tar.xz" | sha256sum -c - || { echo "ERROR: wsdd2 archive SHA-256 mismatch"; rm -f wsdd2.tar.xz; exit 2; }
+    mkdir wsdd2.new
+    tar --strip-components=1 -C wsdd2.new -xJf wsdd2.tar.xz || { echo "ERROR: failed to extract wsdd2 archive"; rm -rf wsdd2.new wsdd2.tar.xz; exit 2; }
+    rm -f wsdd2.tar.xz
+    echo "Applying wsdd2 fixes..."
+    patch -p1 -d wsdd2.new <<'WSDD2_FIXES' || { echo "ERROR: failed to apply wsdd2 fixes"; rm -rf wsdd2.new; exit 2; }
+diff --git a/llmnr.c b/llmnr.c
+index 77cb81e..ba43291 100644
+--- a/llmnr.c
++++ b/llmnr.c
+@@ -173,7 +173,8 @@ static int llmnr_send_response(struct endpoint *ep, _saddr_t *sa,
+ 	in_name = strdup("");
+ 	in_name_len = 0;
+ 	in_name_p = &in[12];
+-	while (*in_name_p > 0) {
++	const uint8_t *in_end = in + inlen;
++	while (in_name_p < in_end && *in_name_p > 0) {
+ 		/*
+ 		 * not supporting message compression
+ 		 * see section 4.1.4 of RFC 1035
+@@ -184,6 +185,13 @@ static int llmnr_send_response(struct endpoint *ep, _saddr_t *sa,
+ 			return -1;
+ 		}
+
++		/* the label body must lie within the packet */
++		if (in_name_p + 1 + *in_name_p >= in_end) {
++			DEBUG(1, L, "llmnr: label runs past end of packet");
++			free(in_name);
++			return -1;
++		}
++
+ 		/* append to the whole name */
+ 		in_name_len += *in_name_p + (*in_name ? 1 : 0); // '.' if not first
+
+@@ -214,6 +222,13 @@ static int llmnr_send_response(struct endpoint *ep, _saddr_t *sa,
+ 	 * this implementation only supports questions of type A
+ 	 * or AAAA
+ 	 */
++	/* need the name terminator plus the 4 bytes of QTYPE and QCLASS */
++	if (in_name_p + 4 >= in_end) {
++		DEBUG(1, L, "llmnr: question section truncated");
++		free(in_name);
++		return -1;
++	}
++
+ 	qtype = in_name_p[1] * 256 + in_name_p[2];
+ 	if (qtype != DNS_TYPE_ANY && qtype != DNS_TYPE_A && qtype != DNS_TYPE_AAAA) {
+ 		DEBUG(1, L, "llmnr: record in question not of type ANY or A or AAAA: %#x", qtype);
+diff --git a/wsd.c b/wsd.c
+index 0337321..ccf7a78 100644
+--- a/wsd.c
++++ b/wsd.c
+@@ -213,11 +213,11 @@ int set_getresp(const char *str, const char **next)
+ 		goto exit;
+ 	val = p;
+
+-	/* Look for end of value. */
+-	while (*p && *p != ':' && *p != ',')
++	/* Look for end of value.  Only a comma ends a value: the key was
++	   already delimited by the first colon, so a colon here belongs to
++	   the value, as it does in every URL the table accepts. */
++	while (*p && *p != ',')
+ 		p++;
+-	if (*p && *p != ',')
+-		goto exit;
+
+ 	vallen = p - val;
+ 	if (next)
+@@ -232,7 +232,7 @@ int set_getresp(const char *str, const char **next)
+ 		return -1;
+
+ 	if (!bootinfo[i].value)
+-		bootinfo[i].value = strndup(val, vallen + 1);
++		bootinfo[i].value = strndup(val, vallen);
+
+ 	return 0;
+
+@@ -857,7 +857,7 @@ static int wsd_send_get_response(int fd,
+ 	ssize_t len = asprintf(&body, body_templ,
+ 				"Microsoft Publication Service Device Host",
+ 				"1.0",
+-				"20050718",
++				get_getresp("serial:"),
+ 				get_getresp("vendor:"),
+ 				get_getresp("vendorurl:"),
+ 				get_getresp("model:"),
+@@ -901,6 +901,11 @@ static int wsd_parse_http_header(int fd, struct endpoint *ep,
+ 	if (!endpointlen)
+ 		endpointlen = strlen(wsd_endpoint);
+
++	if (!eol) {
++		ep->errstr = __FUNCTION__ ": No request line";
++		return 400;
++	}
++
+ 	*eol = '\0';
+ 	if (strncmp(p, "POST /", 6) != 0) {
+ 		ep->errstr = __FUNCTION__ ": Only POST method supported";
+diff --git a/wsdd2.c b/wsdd2.c
+--- a/wsdd2.c
++++ b/wsdd2.c
+@@ -543,7 +543,15 @@ static int netlink_recv(struct endpoint
+ 	char buf[PAGE_SIZE];
+ 	struct sockaddr_nl sa;
+ 	struct iovec iov = { buf, sizeof buf };
+-	struct msghdr msg = { &sa, sizeof sa, &iov, 1, NULL, 0, 0 };
++	struct msghdr msg = {
++		.msg_name = &sa,
++		.msg_namelen = sizeof(sa),
++		.msg_iov = &iov,
++		.msg_iovlen = 1,
++		.msg_control = NULL,
++		.msg_controllen = 0,
++		.msg_flags = 0,
++	};
+ 	ssize_t msglen = recvmsg(ep->sock, &msg, 0);
+ 
+ 	DEBUG(2, W, "%s: %zd bytes", __func__, msglen);
+WSDD2_FIXES
+    echo "$wsdd2_pkg_version" > wsdd2.new/.tch-static-version
+    mv wsdd2.new wsdd2
   fi
   export LDFLAGS="-static -static-libgcc -static-libstdc++"
   pushd wsdd2
 }
 
 wsdd2_version() {
-  git describe --tags $(git rev-list --tags --max-count=1)
+  echo "$wsdd2_pkg_version"
 }
