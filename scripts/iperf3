@@ -4,8 +4,6 @@
 iperf3_binaries="src/iperf3"
 iperf3_configure_options="--disable-shared --enable-static --enable-static-bin"
 iperf3_make_options=""
-iperf3_aarch64="$(uname -m | grep -q 'aarch64' && echo gcc || echo no)"
-iperf3_arm="$(uname -m | grep -q 'armv[567]' || echo no)"
 
 # package variables
 iperf3_Depends=""
@@ -85,5 +83,5 @@ iperf3_pushd() {
 }
 
 iperf3_version() {
-  sed -rn 's|(.*)\[(.*)],\[https://github.com/esnet/iperf],(.*)|\2|p' configure.ac
+  echo 3.22
 }
