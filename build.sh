@@ -137,6 +137,7 @@ fi
 
 __BASE_DIR=$(cd $(dirname $0) && pwd)
 __PACKAGES=""
+__FAILED=()
 
 __default_conffiles() {
 cat <<-"CNF"
@@ -177,17 +178,24 @@ fetch_latest() { # Parameters: none
 }
 
 make_ipk() {
-  ${__BASE_DIR}/bin/make_ipk.sh "$2" "."
+  ${__BASE_DIR}/bin/make_ipk.sh "$2" "." || { rm -f "$2"; __FAILED+=("$(basename $2)"); return; }
   local arch="$1"
   local ipk="$(basename $2)"
+  local name="$(sed -n -e 's/^Package: //p' control)"
   local sha256="$(sha256sum "$2" | cut -d" " -f1)"
   local size="$(du --bytes $2 | cut -f1)"
   local packages="$__BASE_DIR/repository/${arch}/packages/Packages"
+  local old
+  sed -e "/^Package: $name$/,/^$/d" -i $packages
   sed -e "/^Installed-Size:/a\Filename: ${ipk}\nSize: ${size}\nSHA256sum: ${sha256}" control >> $packages
   echo "" >> $packages
   sign_and_zip $packages
   ${__BASE_DIR}/bin/usign -S -m $packages -s ${__BASE_DIR}/keys/seud0nym-private.key -x ${packages}.sig
   gzip -fk $packages
+  for old in $(find $(dirname $2) -name "${name}_*_${arch}.ipk" ! -name "$ipk"); do
+    echo -e "${GREEN}$(date +%X) ==> INFO:  Removing old package $(basename $old)....${GREY}[$(pwd)]${NC}"
+    rm -f $old
+  done
   rm -f control.tar control.tar.gz data.tar data.tar.gz packagetemp.tar
 }
 
@@ -206,6 +214,7 @@ make_package() { # Parameters: script version architecture binary [binary ...]
   for binary in $*; do
     if [ ! -e $binary ]; then
     	echo -e "${RED}$(date +%X) ==> ERROR: Binary $binary not found! Skipping package build...${GREY}[$(pwd)]${NC}"
+      __FAILED+=("${script}-static_${version}_${arch}.ipk")
       return
     fi 
     [ -x $binary ] && strip_and_compress $binary
@@ -319,21 +328,17 @@ pushd .work
       echo -e "${GREY}$(date +%X) ==> DEBUG: CC=$CC${NC}"
       echo -e "${GREY}$(date +%X) ==> DEBUG: STRIP=$__STRIP${NC}"
       echo -e "${GREEN}$(date +%X) ==> INFO:  Getting latest source for $__SCRIPT....${GREY}[$(pwd)]${NC}"
-			eval ${__SCRIPT}_pushd $__BIN_DIR
+			if ! eval ${__SCRIPT}_pushd $__BIN_DIR; then
+				echo -e "${RED}$(date +%X) ==> ERROR: Source for $__SCRIPT not found! Skipping build for $__ARCH...${GREY}[$(pwd)]${NC}"
+				__FAILED+=("$__SCRIPT for ${__OWRT_ARCH[$I]} (no source)")
+				unset CC __STRIP __ARCH __TARGET __BIN_DIR
+				continue
+			fi
 				fetch_latest
 				echo -e "${GREY}$(date +%X) ==> DEBUG: Latest version = $__VERSION${NC}"
 				if [ -e ${__BASE_DIR}/repository/${__OWRT_ARCH[$I]}/packages/${__SCRIPT}-static_${__VERSION}_${__OWRT_ARCH[$I]}.ipk ]; then
 					echo -e "${ORANGE}$(date +%X) ==> INFO:  Skipping build of $__SCRIPT for $__ARCH - Version $__VERSION ipk file already exists!${GREY}[$(pwd)]${NC}"
 				else
-          __PKG_DIR="$__BASE_DIR/repository/${__OWRT_ARCH[$I]}/packages"
-          __OLD_PKG="$__PKG_DIR/${__SCRIPT}-static_[^_]*_${__OWRT_ARCH[$I]}.ipk"
-          if [ -e $__OLD_PKG ]; then
-            echo -e "${GREEN}$(date +%X) ==> INFO:  Removing old $__SCRIPT $__ARCH package....${GREY}[$(pwd)]${NC}"
-            echo -e "${GREY}$(date +%X) ==> DEBUG: $__OLD_PKG${NC}"
-            rm -f $__OLD_PKG
-            sed -e "/^Package: $__SCRIPT-static$/,/^$/d" -i $__PKG_DIR/Packages
-            sign_and_zip $__PKG_DIR/Packages
-          fi
           echo -e "${GREEN}$(date +%X) ==> INFO:  Preparing $__SCRIPT build for $__ARCH....${GREY}[$(pwd)]${NC}"
           if [ -x autogen.sh ]; then
             ./autogen.sh
@@ -371,3 +376,8 @@ pushd .work
     unset __PATH $(set | grep -o "^${__SCRIPT}_[^$= ]*" | xargs)
   done
 popd
+
+for __F in "${__FAILED[@]}"; do
+  echo -e "${RED}$(date +%X) ==> ERROR: Failed to build $__F${NC}"
+done
+[ ${#__FAILED[@]} -eq 0 ] || exit 1
