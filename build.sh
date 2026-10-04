@@ -174,6 +174,7 @@ fetch_latest() { # Parameters: none
     git checkout $__VERSION
   fi
   [ "$(type -t ${__SCRIPT}_version_number)" == "function" ] && __VERSION=$(eval ${__SCRIPT}_version_number)
+  __VERSION="${__VERSION#v}" # package files are named without the v of tags like v3.5.1
 }
 
 make_ipk() {
