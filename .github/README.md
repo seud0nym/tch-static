@@ -70,3 +70,7 @@ Each package to be compiled is configured through a script in the `scripts` fold
 The binaries were built using the `build.sh` script on a Raspberry Pi Zero 2 W running Debian bookworm (Diet-Pi).
 
 The individual OpenWrt opkg .ipk files are built using an adapted version of the `make-ipk.sh` from https://bitsum.com/creating_ipk_packages.htm, which is executed automatically by `build.sh`.
+
+### Toolchains
+
+`build.sh` builds the musl cross toolchains with the `musl-cross-make` submodule, after merging its latest `master`. If a `config/musl-cross-make-*.mak` file exists whose `TARGET` matches a toolchain, it is used as the `musl-cross-make` configuration for that toolchain (pinned tool versions and options, such as the `--enable-default-pie` that a static PIE link needs); otherwise only the `TARGET` is set. The configuration and the `musl-cross-make` commit that each toolchain was built from are recorded in `toolchains/`. An existing toolchain is removed and rebuilt when its configuration file has been added, changed or removed, or when it was built from a `musl-cross-make` commit older than the submodule commit. Updating the submodule therefore brings its patches to every toolchain, such as the musl fixes for CVE-2025-26519, CVE-2026-40200 and CVE-2026-6042 (`musl-cross-make` 227df8b), but a change on `master` alone does not trigger a rebuild. Packages that already exist are not rebuilt; remove them with `build.sh clean <name>` to rebuild them with the new toolchain.
