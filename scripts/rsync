@@ -15,6 +15,7 @@ rsync_configure_options="--without-included-popt \
   --disable-xxhash \
   --disable-iconv \
   --disable-iconv-open \
+  --disable-idn \
   --disable-zstd \
   --disable-xattr-support \
   --disable-acl-support"
