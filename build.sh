@@ -302,7 +302,7 @@ pushd .work
             echo -e "${GREEN}$(date +%X) ==> INFO:  Removing old $__SCRIPT $__ARCH package....${GREY}[$(pwd)]${NC}"
             echo -e "${GREY}$(date +%X) ==> DEBUG: $__OLD_PKG${NC}"
             rm -f $__OLD_PKG
-            sed -e "/^Package: $script-static$/,/^$/d" -i $__PKG_DIR/Packages
+            sed -e "/^Package: $__SCRIPT-static$/,/^$/d" -i $__PKG_DIR/Packages
             sign_and_zip $__PKG_DIR/Packages
           fi
           echo -e "${GREEN}$(date +%X) ==> INFO:  Preparing $__SCRIPT build for $__ARCH....${GREY}[$(pwd)]${NC}"
