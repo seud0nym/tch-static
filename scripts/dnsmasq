@@ -26,6 +26,15 @@
 # dnsrule or sticky_servers: the instance would not start (no DNS or DHCP).
 # Check with: uci -q show dhcp | grep -E '=dnsrule$|sticky_servers='
 #
+# The stock init script also passes a bare --enable-ubus to every instance (the
+# main LAN and the guest network are separate instances), so all of them claim
+# the ubus object "dnsmasq". Stock 2.83 logs "Cannot add object to UBus" in the
+# losing instance and keeps running, but since 2.86 dnsmasq exits instead
+# ("UBus error: Invalid argument", "FAILED to start up"), leaving that network
+# without DNS and DHCP. Current OpenWrt gives each instance its own name; with
+# the stock init script, turn ubus off for all but one instance, for example:
+#   uci set dhcp.guest.ubus='0'; uci commit dhcp
+#
 # Static dependencies: libubus + libubox (pinned to the stock OpenWrt commits,
 # socket /var/run/ubus.sock) for --enable-ubus, and libnetfilter_conntrack +
 # libnfnetlink + libmnl for --conntrack (used by the stock /etc/dnsmasq.conf).
