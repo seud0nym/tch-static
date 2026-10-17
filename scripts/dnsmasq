@@ -164,6 +164,65 @@ dnsmasq_pushd() {
   dnsmasq_build_deps || exit 2
   local dir
   dir="$(dnsmasq_unpack dnsmasq-${dnsmasq_version_pin}.tar.xz)" || exit 2
+  # The prpl Foundation fix for losing ubusd (Petr Štetiar, commit b2749951 on branch ynezz/ppw2469-ubus-bus-loss
+  # of https://gitlab.com/prpl-foundation/mirrors/dnsmasq), backported to 2.93: its src/ubus.c and src/dnsmasq.c
+  # hunks, unchanged apart from context (the prpl base adds a dnsmasq.dns object that 2.93 lacks). Without it, when
+  # ubusd stops or restarts, dnsmasq keeps using the ubus context that the disconnect callback freed, and frees it
+  # a second time on POLLHUP; a successful reconnect inside the callback is dropped in the same poll round.
+  patch -p1 -d "$dir" <<'DNSMASQ_UBUS_LOSS_FIX' >&2 || { echo "dnsmasq: failed to apply the ubus-loss fix" 1>&2; exit 2; }
+diff --git a/src/dnsmasq.c b/src/dnsmasq.c
+index adaa692..45cf521 100644
+--- a/src/dnsmasq.c
++++ b/src/dnsmasq.c
+@@ -1108,8 +1108,12 @@ int main (int argc, char **argv)
+       
+       poll_reset();
+       
+-      /* Whilst polling for the dbus, or doing a tftp transfer, wake every quarter second */
+-      if ((daemon->tftp_trans || (option_bool(OPT_DBUS) && !daemon->dbus)) &&
++      /* Whilst polling for the dbus or ubus, or doing a tftp transfer, wake every quarter second */
++      if ((daemon->tftp_trans || (option_bool(OPT_DBUS) && !daemon->dbus)
++#ifdef HAVE_UBUS
++	   || (option_bool(OPT_UBUS) && !daemon->ubus)
++#endif
++	   ) &&
+ 	  (timeout == -1 || timeout > 250))
+ 	timeout = 250;
+       
+diff --git a/src/ubus.c b/src/ubus.c
+index ec910ec..1c543b6 100644
+--- a/src/ubus.c
++++ b/src/ubus.c
+@@ -91,15 +91,10 @@ static void ubus_destroy(struct ubus_context *ubus)
+ 
+ static void ubus_disconnect_cb(struct ubus_context *ubus)
+ {
+-  int ret;
+-
+-  ret = ubus_reconnect(ubus, NULL);
+-  if (ret)
+-    {
+-      my_syslog(LOG_ERR, _("Cannot reconnect to UBus: %s"), ubus_strerror(ret));
+-
+-      ubus_destroy(ubus);
+-    }
++  /* Only log the loss here. libubus has set sock.eof, and
++     check_ubus_listeners() frees the context after libubus returns. */
++  (void)ubus;
++  my_syslog(LOG_ERR, _("Lost connection to UBus"));
+ }
+ 
+ char *ubus_init()
+@@ -163,7 +158,7 @@ void check_ubus_listeners()
+   if (poll_check(ubus->sock.fd, POLLIN))
+     ubus_handle_event(ubus);
+   
+-  if (poll_check(ubus->sock.fd, POLLHUP | POLLERR))
++  if (ubus->sock.eof || poll_check(ubus->sock.fd, POLLHUP | POLLERR))
+     {
+       my_syslog(LOG_INFO, _("Disconnecting from UBus"));
+ 
+DNSMASQ_UBUS_LOSS_FIX
   export DNSMASQ_CFLAGS="-Os -fPIE -fstack-protector-strong -ffunction-sections -fdata-sections -g0 $dnsmasq_cpu_flags -I$DNSMASQ_SYSROOT/include -ffile-prefix-map=$PWD=/build -Wall -W"
   # gcc 11's arm LINK_SPEC has no -static-pie mapping (it would link libc.so
   # without an interpreter), so spell static PIE out: rcrt1.o + -Bstatic + -pie.
